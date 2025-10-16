@@ -10,16 +10,17 @@ return new class extends Migration
     {
         Schema::create('media', function (Blueprint $table) {
             $table->id();
-            $table->string('filename', 255);
-            $table->string('path', 500);
-            $table->string('mime_type', 100)->nullable();
-            $table->integer('size')->unsigned()->nullable()->comment('in bytes');
-            $table->string('alt_text', 255)->nullable();
-            $table->integer('width')->unsigned()->nullable();
-            $table->integer('height')->unsigned()->nullable();
+            $table->nullableMorphs('mediable');
+            $table->string('name');
+            $table->string('file_name');
+            $table->string('mime_type');
+            $table->string('path');
+            $table->string('disk')->default('public');
+            $table->unsignedBigInteger('size');
+            $table->string('alt_text')->nullable();
+            $table->integer('sort_order')->default(0);
             $table->timestamps();
-
-            $table->index('path');
+            $table->index('sort_order');
         });
     }
 

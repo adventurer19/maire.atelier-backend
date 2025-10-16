@@ -15,8 +15,9 @@ use Illuminate\Support\Facades\Schema;
          Schema::create('attribute_options', function (Blueprint $table) {
              $table->id();
              $table->foreignId('attribute_id')->constrained()->onDelete('cascade');
-             $table->string('slug', 100);
+             $table->string('slug', 100)->unique();
              $table->json('value');
+             $table->json('label');
              $table->string('hex_color', 7)->nullable()->comment('For color swatches');
              $table->integer('position')->default(0);
              $table->timestamps();

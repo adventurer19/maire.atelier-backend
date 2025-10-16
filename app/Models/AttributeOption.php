@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Translatable\HasTranslations;
+
 
 // ============================================
 // ATTRIBUTE OPTION MODEL (S, M, L / Red, Blue)
@@ -12,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class AttributeOption extends Model
 {
-    use HasTranslations;
+    use HasFactory, HasTranslations;
 
     protected $fillable = [
         'attribute_id',
@@ -26,6 +29,8 @@ class AttributeOption extends Model
 
     protected $casts = [
         'position' => 'integer',
+        'value' => 'array',
+        'label' => 'array',
     ];
 
     // ============================================

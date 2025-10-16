@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,7 +13,7 @@ use Spatie\Sluggable\SlugOptions;
 
 class Category extends Model
 {
-    use HasTranslations, HasSlug;
+    use HasTranslations, HasSlug, HasFactory;
 
     protected $fillable = [
         'parent_id',

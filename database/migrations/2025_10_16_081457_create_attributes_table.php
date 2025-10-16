@@ -16,12 +16,17 @@ use Illuminate\Support\Facades\Schema;
              $table->id();
              $table->string('slug', 100)->unique();
              $table->json('name');
-             $table->enum('type', ['select', 'swatch'])->default('select');
+             $table->enum('type', ['text', 'select', 'multiselect', 'color', 'image']);
+             $table->boolean('is_filterable')->default(false);
+             $table->boolean('is_visible')->default(true);
              $table->integer('position')->default(0);
+             $table->integer('sort_order')->default(0);
              $table->timestamps();
 
              $table->index('slug');
              $table->index('position');
+             $table->index('is_filterable');
+
          });
      }
 

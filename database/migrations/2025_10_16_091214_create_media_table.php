@@ -10,17 +10,23 @@ return new class extends Migration
     {
         Schema::create('media', function (Blueprint $table) {
             $table->id();
-            $table->nullableMorphs('model');
+
+            $table->morphs('model');
+            $table->uuid('uuid')->nullable()->unique();
+            $table->string('collection_name');
             $table->string('name');
             $table->string('file_name');
-            $table->string('mime_type');
-            $table->string('path');
-            $table->string('disk')->default('public');
+            $table->string('mime_type')->nullable();
+            $table->string('disk');
+            $table->string('conversions_disk')->nullable();
             $table->unsignedBigInteger('size');
-            $table->string('alt_text')->nullable();
-            $table->integer('sort_order')->default(0);
+            $table->json('manipulations');
+            $table->json('custom_properties');
+            $table->json('generated_conversions');
+            $table->json('responsive_images');
+            $table->unsignedInteger('order_column')->nullable()->index();
+
             $table->timestamps();
-            $table->index('sort_order');
         });
     }
 

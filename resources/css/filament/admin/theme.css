@@ -1,0 +1,55 @@
+/*!* ===========================================*/
+/*   CUSTOM MAIRE ATELIER ADMIN STYLES*/
+/*   =========================================== *!*/
+
+/*!* Fix scroll offset for validation errors *!*/
+/*html {*/
+/*    scroll-padding-top: 140px !important;*/
+/*}*/
+
+/*!* Add scroll offset to form fields *!*/
+/*.fi-fo-field-wrp {*/
+/*    scroll-margin-top: 140px;*/
+/*}*/
+
+/*!* Target focused/invalid fields *!*/
+/*.fi-fo-field-wrp:target,*/
+/*.fi-fo-field-wrp:focus-within {*/
+/*    scroll-margin-top: 140px;*/
+/*}*/
+
+/*!* Make topbar slightly transparent on scroll (optional) *!*/
+/*.fi-topbar {*/
+/*    transition: all 0.3s ease;*/
+/*}*/
+
+/*!* When page is scrolled, add transparency *!*/
+/*body.scrolled .fi-topbar {*/
+/*    background-color: rgba(255, 255, 255, 0.95);*/
+/*    backdrop-filter: blur(10px);*/
+/*    border-bottom: 1px solid rgba(0, 0, 0, 0.05);*/
+/*}*/
+
+/*!* Ensure validation error messages are visible *!*/
+/*.fi-fo-field-wrp-error-message {*/
+/*    margin-top: 0.5rem;*/
+/*    font-weight: 500;*/
+/*}*/
+
+/*!* Highlight invalid fields *!*/
+/*.fi-fo-field-wrp-error .fi-input {*/
+/*    border-color: rgb(239 68 68) !important;*/
+/*    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);*/
+/*}*/
+
+/*!* Smooth scroll behavior *!*/
+/*html {*/
+/*    scroll-behavior: smooth;*/
+/*}*/
+
+/*!* Optional: Sticky header adjustments *!*/
+/*.fi-topbar {*/
+/*    position: sticky;*/
+/*    top: 0;*/
+/*    z-index: 40;*/
+/*}*/

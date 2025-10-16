@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
             NewsletterSubscriberSeeder::class,
             CouponSeeder::class,
             RedirectSeeder::class,
+            AdminUserSeeder::class,
         ]);
     }
 }

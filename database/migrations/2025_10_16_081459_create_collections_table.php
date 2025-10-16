@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Schema;
              $table->json('meta_description')->nullable();
              $table->enum('type', ['manual', 'auto'])->default('manual');
              $table->boolean('is_active')->default(true);
+             $table->integer('sort_order')->default(0);
              $table->integer('position')->default(0);
              $table->timestamps();
 

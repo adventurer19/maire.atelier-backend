@@ -15,12 +15,12 @@ return new class extends Migration
             $table->string('first_name', 100);
             $table->string('last_name', 100);
             $table->string('company', 255)->nullable();
-            $table->string('address_line1', 255);
-            $table->string('address_line2', 255)->nullable();
+            $table->string('address_line_1', 255);
+            $table->string('address_line_2', 255)->nullable();
             $table->string('city', 100);
             $table->string('state', 100)->nullable();
             $table->string('postal_code', 20);
-            $table->string('country', 2)->comment('ISO 3166-1 alpha-2');
+            $table->string('country', 2); // ISO country code
             $table->string('phone', 50)->nullable();
             $table->boolean('is_default')->default(false);
             $table->timestamps();

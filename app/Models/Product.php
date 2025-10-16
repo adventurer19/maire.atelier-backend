@@ -63,8 +63,6 @@ class Product extends Model implements HasMedia
         'depth' => 'decimal:2',
     ];
 
-    protected $with = ['media'];
-
     public function getSlugOptions(): SlugOptions
     {
         return SlugOptions::create()
@@ -78,12 +76,13 @@ class Product extends Model implements HasMedia
         return 'slug';
     }
 
-    public function registerMediaCollections(): void
-    {
-        $this->addMediaCollection('images')
-            ->useFallbackUrl('/images/placeholder-product.jpg')
-            ->useFallbackPath(public_path('/images/placeholder-product.jpg'));
-    }
+   public function registerMediaCollections(): void
+   {
+       $this
+           ->addMediaCollection('images')
+           ->useFallbackUrl('/images/placeholder-product.jpg')
+           ->useFallbackPath(public_path('/images/placeholder-product.jpg'));
+   }
 
     // RELATIONSHIPS
     public function categories(): BelongsToMany

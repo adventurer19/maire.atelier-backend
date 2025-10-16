@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('newsletter_subscribers', function (Blueprint $table) {
             $table->id();
             $table->string('email')->unique();
+            $table->boolean('is_active')->default(true);
             $table->enum('status', ['subscribed', 'unsubscribed'])->default('subscribed');
             $table->timestamp('subscribed_at')->useCurrent();
             $table->timestamp('unsubscribed_at')->nullable();

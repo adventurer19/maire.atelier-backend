@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -17,7 +18,8 @@ class AddressFactory extends Factory
     public function definition(): array
      {
          return [
-             'user_id' => \App\Models\User::factory(),
+             'user_id' => User::factory(),
+             'type' => $this->faker->randomElement(['shipping', 'billing']),
              'first_name' => $this->faker->firstName(),
              'last_name' => $this->faker->lastName(),
              'company' => $this->faker->optional()->company(),

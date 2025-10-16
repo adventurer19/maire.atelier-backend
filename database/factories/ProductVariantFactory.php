@@ -18,9 +18,8 @@ class ProductVariantFactory extends Factory
     {
         return [
             'product_id' => \App\Models\Product::factory(),
-            'sku' => $this->faker->unique()->bothify('VAR-####'),
+            'sku' => 'VAR-' . $this->faker->unique()->numberBetween(1000, 9999),
             'price' => $this->faker->randomFloat(2, 10, 500),
-            'sale_price' => $this->faker->optional()->randomFloat(2, 5, 400),
             'stock_quantity' => $this->faker->numberBetween(0, 100),
             'is_active' => $this->faker->boolean(90),
         ];

@@ -148,7 +148,7 @@ class ProductVariant extends Model implements HasMedia
     /**
      * Get attribute value by slug (e.g., "size" => "M")
      */
-    public function getAttributeValue(string $attributeSlug): ?string
+    public function getVariantAttributeValue(string $attributeSlug): ?string
     {
         $option = $this->attributeOptions
             ->first(fn($option) => $option->attribute->slug === $attributeSlug);

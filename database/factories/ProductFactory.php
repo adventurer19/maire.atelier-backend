@@ -27,7 +27,7 @@ class ProductFactory extends Factory
             'meta_title' => ['en' => $this->faker->sentence()],
             'meta_description' => ['en' => $this->faker->paragraph()],
             'price' => $this->faker->randomFloat(2, 10, 1000),
-            'sale_price' => $this->faker->optional()->randomFloat(2, 5, 900),
+            'sale_price' => $this->faker->optional(0.3)->randomFloat(2, 5, 900),
             'compare_at_price' => $this->faker->optional()->randomFloat(2, 1000, 1500),
             'cost_price' => $this->faker->optional()->randomFloat(2, 5, 500),
             'is_active' => $this->faker->boolean(80),

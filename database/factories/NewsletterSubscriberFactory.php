@@ -17,9 +17,9 @@ class NewsletterSubscriberFactory extends Factory
     public function definition(): array
     {
         return [
-            'email' => $this->faker->unique()->safeEmail(),
-            'is_active' => $this->faker->boolean(90),
-            'subscribed_at' => $this->faker->dateTimeBetween('-1 year', 'now'),
+            'email' => fake()->unique()->safeEmail(),
+            'is_active' => fake()->boolean(90),
+            'subscribed_at' => fake()->dateTimeBetween('-1 year', 'now'),
         ];
     }
 }

@@ -24,6 +24,7 @@ return new class extends Migration
             $table->json('meta_title')->nullable();
             $table->json('meta_description')->nullable();
             $table->decimal('price', 10, 2);
+            $table->decimal('sale_price', 10, 2)->nullable();
             $table->decimal('compare_at_price', 10, 2)->nullable();
             $table->decimal('cost_price', 10, 2)->nullable();
             $table->boolean('is_active')->default(true);

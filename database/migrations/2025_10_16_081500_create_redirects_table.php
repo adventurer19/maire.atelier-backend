@@ -14,13 +14,14 @@ use Illuminate\Support\Facades\Schema;
      {
          Schema::create('redirects', function (Blueprint $table) {
              $table->id();
-             $table->string('old_url', 500);
-             $table->string('new_url', 500);
+             $table->string('from_url')->unique();
+             $table->string('to_url');
              $table->smallInteger('status_code')->default(301);
              $table->boolean('is_active')->default(true);
              $table->timestamps();
 
-             $table->index('old_url');
+
+             $table->index('from_url');
              $table->index('is_active');
          });
      }

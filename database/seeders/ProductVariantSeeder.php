@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Product;
 use App\Models\ProductVariant;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class ProductVariantSeeder extends Seeder
@@ -13,12 +13,11 @@ class ProductVariantSeeder extends Seeder
      */
     public function run(): void
     {
-        $products = \App\Models\Product::take(20)->get();
-
+        $products = Product::take(20)->get();
         foreach ($products as $product) {
-            ProductVariant::factory()->count(rand(2, 5))->create([
-                'product_id' => $product->id,
-            ]);
+            ProductVariant::factory()
+                ->for($product)
+                ->create();
         }
     }
 }

@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Models\Product;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -16,11 +18,15 @@ class CartItemFactory extends Factory
      */
     public function definition(): array
     {
+        $product = Product::inRandomOrder()->first();
+        $variant = $product?->variants()->inRandomOrder()->first();
+
         return [
-            'user_id' => \App\Models\User::factory(),
-            'product_id' => \App\Models\Product::factory(),
-            'product_variant_id' => null,
-            'quantity' => $this->faker->numberBetween(1, 5),
+            'user_id' => User::factory(),
+            'product_id' => $product->id,
+            'session_id' => fake()->uuid(),
+            'product_variant_id' => $variant?->id,
+            'quantity' => fake()->numberBetween(1, 5),
         ];
     }
 }

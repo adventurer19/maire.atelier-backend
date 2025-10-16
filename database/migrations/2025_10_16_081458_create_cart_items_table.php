@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('session_id')->comment('for guests');
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
+            $table->foreignId('product_variant_id')->nullable()->constrained()->onDelete('cascade'); // Add this
             $table->foreignId('variant_id')->nullable()->constrained('product_variants')->onDelete('cascade');
             $table->integer('quantity')->default(1);
             $table->timestamps();

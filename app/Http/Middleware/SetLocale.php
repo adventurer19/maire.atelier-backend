@@ -1,9 +1,11 @@
 <?php
+// app/Http/Middleware/SetLocale.php
 
 namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Session;
 use Symfony\Component\HttpFoundation\Response;
 
 class SetLocale
@@ -11,35 +13,41 @@ class SetLocale
     /**
      * Handle an incoming request.
      *
-     * Автоматично сменя езика според:
-     * 1. Accept-Language header (приоритет)
-     * 2. X-Locale header (алтернатива)
-     * 3. ?lang=bg query параметър
-     * 4. APP_LOCALE от .env (default)
+     * Automatically switches language based on:
+     * 1. Session locale (for Filament admin panel)
+     * 2. X-Locale header (for Next.js frontend)
+     * 3. Accept-Language header (browser default)
+     * 4. ?lang=bg query parameter
+     * 5. APP_LOCALE from .env (fallback)
      */
     public function handle(Request $request, Closure $next): Response
     {
         $locale = null;
 
-        // 1. Проверка за X-Locale header (за Next.js по-лесно)
-        if ($request->hasHeader('X-Locale')) {
+        // 1. Check session first (for Filament admin panel persistence)
+        if (Session::has('locale')) {
+            $locale = Session::get('locale');
+        }
+
+        // 2. Check for X-Locale header (for Next.js)
+        if (!$locale && $request->hasHeader('X-Locale')) {
             $locale = $request->header('X-Locale');
         }
 
-        // 2. Проверка за Accept-Language header
+        // 3. Check for Accept-Language header
         if (!$locale && $request->hasHeader('Accept-Language')) {
             $locale = $this->parseAcceptLanguage($request->header('Accept-Language'));
         }
 
-        // 3. Проверка за query параметър (?lang=bg)
+        // 4. Check for query parameter (?lang=bg)
         if (!$locale && $request->has('lang')) {
             $locale = $request->query('lang');
         }
 
-        // Валидни езици
+        // Valid locales
         $availableLocales = config('app.available_locales', ['bg', 'en']);
 
-        // Сетни езика само ако е валиден
+        // Set locale only if valid
         if ($locale && in_array($locale, $availableLocales)) {
             app()->setLocale($locale);
         }
@@ -50,19 +58,19 @@ class SetLocale
     /**
      * Parse Accept-Language header
      *
-     * Пример: "bg-BG,bg;q=0.9,en;q=0.8" -> "bg"
-     * Пример: "en-US,en;q=0.9" -> "en"
+     * Example: "bg-BG,bg;q=0.9,en;q=0.8" -> "bg"
+     * Example: "en-US,en;q=0.9" -> "en"
      */
     private function parseAcceptLanguage(string $header): ?string
     {
-        // Вземи първия език от header-а
+        // Get first language from header
         $languages = explode(',', $header);
 
         if (empty($languages)) {
             return null;
         }
 
-        // Извади само основния език код (bg от bg-BG)
+        // Extract only the main language code (bg from bg-BG)
         $primaryLanguage = explode('-', explode(';', $languages[0])[0])[0];
 
         return strtolower(trim($primaryLanguage));

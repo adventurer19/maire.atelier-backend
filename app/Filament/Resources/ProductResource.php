@@ -11,9 +11,11 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-// use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
+
 
 class ProductResource extends Resource
 {
@@ -48,75 +50,70 @@ class ProductResource extends Resource
                                     ->maxLength(255),
 
                                 Forms\Components\TextInput::make('slug')
+                                    ->disabled()
+                                    ->dehydrated()
                                     ->required()
-                                    ->unique(ignoreRecord: true)
-                                    ->maxLength(255),
-
-                                Forms\Components\TextInput::make('sku')
-                                    ->label('SKU')
-                                    ->required()
-                                    ->unique(ignoreRecord: true)
-                                    ->maxLength(100),
+                                    ->unique(Product::class, 'slug', ignoreRecord: true),
                             ]),
 
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\RichEditor::make('description.en')
-                                    ->label('Description (EN)')
-                                    ->columnSpanFull(),
+                        Forms\Components\RichEditor::make('description.en')
+                            ->label('Description (EN)')
+                            ->columnSpanFull(),
 
-                                Forms\Components\RichEditor::make('description.bg')
-                                    ->label('Description (BG)')
-                                    ->columnSpanFull(),
-                            ]),
+                        Forms\Components\RichEditor::make('description.bg')
+                            ->label('Description (BG)')
+                            ->columnSpanFull(),
+
+                        Forms\Components\TextInput::make('sku')
+                            ->label('SKU')
+                            ->unique(Product::class, 'sku', ignoreRecord: true)
+                            ->helperText('Unique product identifier'),
                     ]),
 
-                Forms\Components\Section::make('Pricing & Inventory')
+                Forms\Components\Section::make('Pricing')
                     ->schema([
-                        Forms\Components\Grid::make(3)
+                        Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\TextInput::make('price')
                                     ->numeric()
-                                    ->required()
-                                    ->prefix('€')
+                                    ->prefix('BGN')
                                     ->minValue(0)
-                                    ->step(0.01),
+                                    ->step(0.01)
+                                    ->required(),
 
                                 Forms\Components\TextInput::make('compare_at_price')
                                     ->label('Compare at Price')
                                     ->numeric()
-                                    ->prefix('€')
+                                    ->prefix('BGN')
                                     ->minValue(0)
                                     ->step(0.01)
-                                    ->helperText('Original price for showing discount'),
-
-                                Forms\Components\TextInput::make('cost_per_item')
-                                    ->numeric()
-                                    ->prefix('€')
-                                    ->minValue(0)
-                                    ->step(0.01)
-                                    ->helperText('Cost from supplier'),
+                                    ->helperText('Original price for showing discounts'),
                             ]),
 
+                        Forms\Components\Toggle::make('is_taxable')
+                            ->label('Charge Tax')
+                            ->default(true),
+                    ]),
+
+                Forms\Components\Section::make('Inventory')
+                    ->schema([
                         Forms\Components\Grid::make(3)
                             ->schema([
                                 Forms\Components\TextInput::make('stock_quantity')
                                     ->label('Stock Quantity')
                                     ->numeric()
-                                    ->required()
                                     ->minValue(0)
-                                    ->default(0),
+                                    ->default(0)
+                                    ->required(),
 
                                 Forms\Components\TextInput::make('low_stock_threshold')
                                     ->numeric()
                                     ->minValue(0)
-                                    ->default(5)
-                                    ->helperText('Alert when stock falls below this'),
+                                    ->helperText('Alert when stock is below this number'),
 
                                 Forms\Components\Select::make('stock_status')
                                     ->options([
                                         'in_stock' => 'In Stock',
-                                        'low_stock' => 'Low Stock',
                                         'out_of_stock' => 'Out of Stock',
                                         'preorder' => 'Pre-order',
                                     ])
@@ -146,16 +143,19 @@ class ProductResource extends Resource
                             ->helperText('Add to collections (optional)'),
                     ]),
 
-                // Forms\Components\Section::make('Product Images')
-                //     ->schema([
-                //         Forms\Components\FileUpload::make('images')
-                //             ->multiple()
-                //             ->image()
-                //             ->imageEditor()
-                //             ->maxFiles(10)
-                //             ->directory('products')
-                //             ->helperText('Upload up to 10 images. First image will be the main product image.'),
-                //     ]),
+                // ✅ АКТИВИРАНА СЕКЦИЯ ЗА СНИМКИ
+                Forms\Components\Section::make('Product Images')
+                    ->schema([
+                        SpatieMediaLibraryFileUpload::make('images')
+                            ->collection('images')
+                            ->multiple()
+                            ->image()
+                            ->imageEditor()
+                            ->maxFiles(10)
+                            ->reorderable()
+                            ->helperText('Upload up to 10 images. First image will be the main product image.')
+                            ->columnSpanFull(),
+                    ]),
 
                 Forms\Components\Section::make('Shipping & Dimensions')
                     ->schema([
@@ -191,55 +191,16 @@ class ProductResource extends Resource
                             ->helperText('Does this product need to be shipped?'),
                     ]),
 
-                Forms\Components\Section::make('SEO & Metadata')
-                    ->collapsible()
+                Forms\Components\Section::make('Status & Visibility')
                     ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('meta_title.en')
-                                    ->label('Meta Title (EN)')
-                                    ->maxLength(60)
-                                    ->helperText('Max 60 characters'),
+                        Forms\Components\Toggle::make('is_active')
+                            ->label('Active')
+                            ->default(true)
+                            ->helperText('Product will be visible in the store'),
 
-                                Forms\Components\TextInput::make('meta_title.bg')
-                                    ->label('Meta Title (BG)')
-                                    ->maxLength(60),
-                            ]),
-
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\Textarea::make('meta_description.en')
-                                    ->label('Meta Description (EN)')
-                                    ->maxLength(160)
-                                    ->rows(3)
-                                    ->helperText('Max 160 characters'),
-
-                                Forms\Components\Textarea::make('meta_description.bg')
-                                    ->label('Meta Description (BG)')
-                                    ->maxLength(160)
-                                    ->rows(3),
-                            ]),
-                    ]),
-
-                Forms\Components\Section::make('Status & Settings')
-                    ->schema([
-                        Forms\Components\Grid::make(3)
-                            ->schema([
-                                Forms\Components\Toggle::make('is_active')
-                                    ->label('Active')
-                                    ->default(true)
-                                    ->helperText('Show product on storefront'),
-
-                                Forms\Components\Toggle::make('is_featured')
-                                    ->label('Featured')
-                                    ->default(false)
-                                    ->helperText('Show in featured section'),
-
-                                Forms\Components\Toggle::make('has_variants')
-                                    ->label('Has Variants')
-                                    ->default(false)
-                                    ->helperText('Enable size/color variants'),
-                            ]),
+                        Forms\Components\Toggle::make('is_featured')
+                            ->label('Featured Product')
+                            ->helperText('Show in featured products section'),
                     ]),
             ]);
     }
@@ -248,31 +209,35 @@ class ProductResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('sku')
-                    ->label('SKU')
-                    ->searchable()
-                    ->sortable()
-                    ->copyable()
-                    ->weight('bold'),
+                // СНИМКА (ПЪРВА КОЛОНА)
+                Tables\Columns\SpatieMediaLibraryImageColumn::make('images')
+                    ->collection('images')
+                    ->label('Image')
+                    ->size(50)
+                    ->circular(),
 
+                // ИМЕ НА ПРОДУКТА
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable()
                     ->wrap()
-                    ->limit(30),
+                    ->limit(40),
 
+                // SKU (БЕЗ ДУБЛИРАНЕ!)
                 Tables\Columns\TextColumn::make('sku')
                     ->label('SKU')
                     ->searchable()
                     ->sortable()
                     ->copyable(),
 
+                // ЦЕНА
                 Tables\Columns\TextColumn::make('price')
-                    ->money('EUR')
+                    ->money('BGN')
                     ->sortable(),
 
+                // НАЛИЧНОСТ
                 Tables\Columns\TextColumn::make('stock_quantity')
-                    ->label('Stock')
+                    ->label('Stock quantity')
                     ->sortable()
                     ->alignCenter()
                     ->badge()
@@ -282,103 +247,54 @@ class ProductResource extends Resource
                         default => 'success',
                     }),
 
-                Tables\Columns\TextColumn::make('stock_status')
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'in_stock' => 'success',
-                        'low_stock' => 'warning',
-                        'out_of_stock' => 'danger',
-                        'preorder' => 'info',
-                    }),
-
-                Tables\Columns\TextColumn::make('categories.name')
-                    ->badge()
-                    ->separator(',')
-                    ->limit(2),
-
+                // АКТИВЕН
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label('Active')
                     ->boolean()
-                    ->alignCenter(),
+                    ->sortable(),
 
-                Tables\Columns\IconColumn::make('is_featured')
-                    ->label('Featured')
-                    ->boolean()
-                    ->alignCenter(),
-
+                // ДАТА НА СЪЗДАВАНЕ (СКРИТА ПО ПОДРАЗБИРАНЕ)
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('stock_status')
-                    ->options([
-                        'in_stock' => 'In Stock',
-                        'low_stock' => 'Low Stock',
-                        'out_of_stock' => 'Out of Stock',
-                        'preorder' => 'Pre-order',
-                    ]),
-
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Active')
-                    ->placeholder('All products')
-                    ->trueLabel('Active only')
-                    ->falseLabel('Inactive only'),
+                    ->boolean()
+                    ->trueLabel('Active products')
+                    ->falseLabel('Inactive products')
+                    ->native(false),
 
                 Tables\Filters\TernaryFilter::make('is_featured')
                     ->label('Featured')
-                    ->placeholder('All products')
-                    ->trueLabel('Featured only')
-                    ->falseLabel('Not featured'),
+                    ->boolean()
+                    ->trueLabel('Featured products')
+                    ->falseLabel('Not featured')
+                    ->native(false),
 
-                Tables\Filters\Filter::make('low_stock')
-                    ->label('Low Stock')
-                    ->query(fn (Builder $query) => $query->where('stock_quantity', '<=', 10)),
-
-                Tables\Filters\SelectFilter::make('categories')
-                    ->relationship('categories', 'name')
-                    ->multiple()
-                    ->preload(),
+                Tables\Filters\SelectFilter::make('stock_status')
+                    ->options([
+                        'in_stock' => 'In Stock',
+                        'out_of_stock' => 'Out of Stock',
+                        'preorder' => 'Pre-order',
+                    ]),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
-
-                    Tables\Actions\BulkAction::make('activate')
-                        ->label('Activate')
-                        ->icon('heroicon-o-check-circle')
-                        ->action(fn ($records) => $records->each->update(['is_active' => true]))
-                        ->deselectRecordsAfterCompletion()
-                        ->requiresConfirmation(),
-
-                    Tables\Actions\BulkAction::make('deactivate')
-                        ->label('Deactivate')
-                        ->icon('heroicon-o-x-circle')
-                        ->action(fn ($records) => $records->each->update(['is_active' => false]))
-                        ->deselectRecordsAfterCompletion()
-                        ->requiresConfirmation(),
-
-                    Tables\Actions\BulkAction::make('feature')
-                        ->label('Mark as Featured')
-                        ->icon('heroicon-o-star')
-                        ->action(fn ($records) => $records->each->update(['is_featured' => true]))
-                        ->deselectRecordsAfterCompletion(),
                 ]),
-            ])
-            ->defaultSort('created_at', 'desc');
+            ]);
     }
 
     public static function getRelations(): array
     {
         return [
-            RelationManagers\VariantsRelationManager::class,
-            RelationManagers\ReviewsRelationManager::class,
+            //
         ];
     }
 
@@ -388,12 +304,6 @@ class ProductResource extends Resource
             'index' => Pages\ListProducts::route('/'),
             'create' => Pages\CreateProduct::route('/create'),
             'edit' => Pages\EditProduct::route('/{record}/edit'),
-            'view' => Pages\ViewProduct::route('/{record}'),
         ];
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return static::getModel()::count();
     }
 }

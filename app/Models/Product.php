@@ -33,6 +33,9 @@ class Product extends Model implements HasMedia
         'is_featured',
         'stock_quantity',
         'low_stock_threshold',
+        'stock_status',
+        'is_taxable',
+        'requires_shipping',
         'weight',
         'width',
         'height',
@@ -55,6 +58,8 @@ class Product extends Model implements HasMedia
         'cost_price' => 'decimal:2',
         'is_active' => 'boolean',
         'is_featured' => 'boolean',
+        'is_taxable' => 'boolean',
+        'requires_shipping' => 'boolean',
         'stock_quantity' => 'integer',
         'low_stock_threshold' => 'integer',
         'weight' => 'decimal:2',
@@ -76,15 +81,21 @@ class Product extends Model implements HasMedia
         return 'slug';
     }
 
-   public function registerMediaCollections(): void
-   {
-       $this
-           ->addMediaCollection('images')
-           ->useFallbackUrl('/images/placeholder-product.jpg')
-           ->useFallbackPath(public_path('/images/placeholder-product.jpg'));
-   }
+    /**
+     * Register media collections for Spatie Media Library
+     */
+    public function registerMediaCollections(): void
+    {
+        $this
+            ->addMediaCollection('images')
+            ->useFallbackUrl('/images/placeholder-product.jpg')
+            ->useFallbackPath(public_path('/images/placeholder-product.jpg'));
+    }
 
+    // ============================================
     // RELATIONSHIPS
+    // ============================================
+
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class, 'product_categories');
@@ -122,7 +133,52 @@ class Product extends Model implements HasMedia
         return $this->hasMany(WishlistItem::class);
     }
 
+    // ============================================
+    // IMAGE HELPER METHODS
+    // ============================================
+
+    /**
+     * Get primary/first image URL
+     */
+    public function getPrimaryImageUrl(): ?string
+    {
+        $media = $this->getFirstMedia('images');
+
+        return $media ? $media->getUrl() : asset('/images/placeholder-product.jpg');
+    }
+
+    /**
+     * Get all product image URLs
+     */
+    public function getAllImageUrls(): array
+    {
+        return $this->getMedia('images')
+            ->map(fn($media) => $media->getUrl())
+            ->toArray();
+    }
+
+    /**
+     * Get thumbnail URL (medium size)
+     */
+    public function getThumbnailUrl(string $conversion = 'thumb'): ?string
+    {
+        $media = $this->getFirstMedia('images');
+
+        return $media ? $media->getUrl($conversion) : asset('/images/placeholder-product.jpg');
+    }
+
+    /**
+     * Check if product has images
+     */
+    public function hasImages(): bool
+    {
+        return $this->hasMedia('images');
+    }
+
+    // ============================================
     // SCOPES
+    // ============================================
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -135,91 +191,59 @@ class Product extends Model implements HasMedia
 
     public function scopeInStock($query)
     {
-        return $query->where('stock_quantity', '>', 0);
+        return $query->where('stock_quantity', '>', 0)
+            ->orWhere('stock_status', 'in_stock');
     }
 
-    public function scopeWithCategory($query, $categorySlug)
+    // ============================================
+    // HELPER METHODS
+    // ============================================
+
+    /**
+     * Check if product is in stock
+     */
+    public function isInStock(): bool
     {
-        return $query->whereHas('categories', function ($q) use ($categorySlug) {
-            $q->where('slug', $categorySlug);
-        });
+        return $this->stock_quantity > 0 || $this->stock_status === 'in_stock';
     }
 
-    public function scopePriceRange($query, $min = null, $max = null)
+    /**
+     * Check if stock is low
+     */
+    public function isLowStock(): bool
     {
-        if ($min) {
-            $query->where('price', '>=', $min);
+        if (!$this->low_stock_threshold) {
+            return false;
         }
-        if ($max) {
-            $query->where('price', '<=', $max);
-        }
-        return $query;
+
+        return $this->stock_quantity <= $this->low_stock_threshold;
     }
 
-    // HELPERS
-    public function hasDiscount(): bool
+    /**
+     * Get final price (considering discount)
+     */
+    public function getFinalPrice(): float
     {
-        return $this->compare_at_price && $this->compare_at_price > $this->price;
+        return (float) $this->price;
     }
 
+    /**
+     * Get discount percentage
+     */
     public function getDiscountPercentage(): ?int
     {
-        if (!$this->hasDiscount()) {
+        if (!$this->compare_at_price || $this->compare_at_price <= $this->price) {
             return null;
         }
+
         return (int) round((($this->compare_at_price - $this->price) / $this->compare_at_price) * 100);
     }
 
-    public function isLowStock(): bool
+    /**
+     * Check if product has discount
+     */
+    public function hasDiscount(): bool
     {
-        return $this->stock_quantity > 0 && $this->stock_quantity <= $this->low_stock_threshold;
-    }
-
-    public function isOutOfStock(): bool
-    {
-        return $this->stock_quantity <= 0;
-    }
-
-    public function getAverageRating(): float
-    {
-        return (float) $this->reviews()->approved()->avg('rating') ?? 0;
-    }
-
-    public function getReviewsCount(): int
-    {
-        return $this->reviews()->approved()->count();
-    }
-
-    public function getPrimaryImageUrl(): ?string
-    {
-        return $this->getFirstMediaUrl('images');
-    }
-
-    public function getAllImageUrls(): array
-    {
-        return $this->getMedia('images')->map(fn($media) => $media->getUrl())->toArray();
-    }
-
-    public function hasVariants(): bool
-    {
-        return $this->variants()->exists();
-    }
-
-    public function getTotalStock(): int
-    {
-        if ($this->hasVariants()) {
-            return $this->variants()->sum('stock_quantity');
-        }
-        return $this->stock_quantity;
-    }
-
-    public function decreaseStock(int $quantity): void
-    {
-        $this->decrement('stock_quantity', $quantity);
-    }
-
-    public function increaseStock(int $quantity): void
-    {
-        $this->increment('stock_quantity', $quantity);
+        return $this->compare_at_price && $this->compare_at_price > $this->price;
     }
 }

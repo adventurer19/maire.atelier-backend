@@ -14,17 +14,12 @@ use App\Http\Controllers\Api\AddressController;
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-| Базов URL: http://maire.atelier.test/api
-|
+| Base URL: http://maire.atelier.test/api
+|--------------------------------------------------------------------------
 */
 
 // ============================================
-// PUBLIC ROUTES (Без authentication)
+// PUBLIC ROUTES
 // ============================================
 
 // Health check
@@ -37,30 +32,41 @@ Route::get('/health', function () {
     ]);
 });
 
-// Products - публични
+// Products
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::get('/featured', [ProductController::class, 'featured']);
     Route::get('/{product:slug}', [ProductController::class, 'show']);
 });
 
-// Categories - публични
+// Categories
 Route::prefix('categories')->group(function () {
     Route::get('/', [CategoryController::class, 'index']);
     Route::get('/{category:slug}', [CategoryController::class, 'show']);
 });
 
-// Collections - публични
+// Collections
 Route::prefix('collections')->group(function () {
     Route::get('/', [CollectionController::class, 'index']);
     Route::get('/{collection:slug}', [CollectionController::class, 'show']);
 });
 
-// Search - публичен
+// Search
 Route::get('/search', [ProductController::class, 'search']);
 
+// Cart - Public (works for guests with session)
+Route::prefix('cart')->group(function () {
+    Route::get('/', [CartController::class, 'index']);
+    Route::get('/count', [CartController::class, 'count']);
+    Route::post('/items', [CartController::class, 'addItem']);
+    Route::put('/items/{item}', [CartController::class, 'updateItem']);
+    Route::delete('/items/{item}', [CartController::class, 'removeItem']);
+    Route::delete('/', [CartController::class, 'clear']);
+    Route::post('/validate', [CartController::class, 'validate']);
+});
+
 // ============================================
-// AUTHENTICATED ROUTES (Sanctum required)
+// AUTHENTICATED ROUTES
 // ============================================
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -72,23 +78,14 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 
-    // Orders - само собствените поръчки
+    // Orders
     Route::prefix('orders')->group(function () {
         Route::get('/', [OrderController::class, 'index']);
         Route::post('/', [OrderController::class, 'store']);
         Route::get('/{order}', [OrderController::class, 'show']);
     });
 
-    // Cart - кошница
-    Route::prefix('cart')->group(function () {
-        Route::get('/', [CartController::class, 'index']);
-        Route::post('/items', [CartController::class, 'addItem']);
-        Route::put('/items/{item}', [CartController::class, 'updateItem']);
-        Route::delete('/items/{item}', [CartController::class, 'removeItem']);
-        Route::delete('/', [CartController::class, 'clear']);
-    });
-
-    // Wishlist - любими продукти
+    // Wishlist
     Route::prefix('wishlist')->group(function () {
         Route::get('/', [WishlistController::class, 'index']);
         Route::post('/', [WishlistController::class, 'add']);
@@ -96,17 +93,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/toggle/{product}', [WishlistController::class, 'toggle']);
     });
 
-    // Addresses - адреси за доставка
+    // Addresses
     Route::apiResource('addresses', AddressController::class);
 });
 
 // ============================================
-// ADMIN ROUTES (за админски операции)
+// ADMIN ROUTES
 // ============================================
 
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
 
-    // Dashboard статистики
+    // Dashboard stats
     Route::get('/dashboard/stats', function () {
         return response()->json([
             'message' => 'Admin Dashboard Stats',
@@ -118,7 +115,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
         ]);
     });
 
-    // Export данни (placeholder)
+    // Export
     Route::get('/orders/export', function () {
         return response()->json(['message' => 'Orders export functionality']);
     });
@@ -127,14 +124,14 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
         return response()->json(['message' => 'Products export functionality']);
     });
 
-    // Bulk операции (placeholder)
+    // Bulk operations
     Route::post('/products/bulk-update', function () {
         return response()->json(['message' => 'Products bulk update functionality']);
     });
 });
 
 // ============================================
-// FALLBACK ROUTE (404 for API)
+// FALLBACK - 404
 // ============================================
 
 Route::fallback(function () {

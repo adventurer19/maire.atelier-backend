@@ -22,107 +22,71 @@ class CartItem extends Model
         'quantity' => 'integer',
     ];
 
-    // ============================================
-    // RELATIONSHIPS
-    // ============================================
+    protected $with = ['product', 'variant'];
 
+    /**
+     * Get the user that owns the cart item
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Get the product for this cart item
+     */
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
     }
 
+    /**
+     * Get the variant for this cart item (if any)
+     */
     public function variant(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
 
-    // ============================================
-    // HELPERS
-    // ============================================
-
     /**
-     * Get item subtotal (price * quantity)
+     * Calculate the subtotal for this cart item
      */
-    public function getSubtotal(): float
+    public function getSubtotalAttribute(): float
     {
-        $price = $this->variant
-            ? $this->variant->getFinalPrice()
-            : $this->product->price;
-
+        $price = $this->variant?->price ?? $this->product->price;
         return $price * $this->quantity;
     }
 
     /**
-     * Get unit price
+     * Get the item price (variant or product)
      */
-    public function getUnitPrice(): float
+    public function getPriceAttribute(): float
     {
-        return $this->variant
-            ? $this->variant->getFinalPrice()
-            : $this->product->price;
+        return $this->variant?->price ?? $this->product->price;
     }
 
     /**
-     * Check if item is in stock
+     * Check if product has enough stock
      */
-    public function isInStock(): bool
+    public function hasEnoughStock(): bool
     {
-        if ($this->variant) {
-            return $this->variant->stock_quantity >= $this->quantity;
-        }
-
-        return $this->product->stock_quantity >= $this->quantity;
+        $stock = $this->variant?->stock ?? $this->product->stock;
+        return $stock >= $this->quantity;
     }
 
     /**
-     * Get available stock
+     * Scope to filter by session ID
      */
-    public function getAvailableStock(): int
+    public function scopeForSession($query, string $sessionId)
     {
-        return $this->variant
-            ? $this->variant->stock_quantity
-            : $this->product->stock_quantity;
+        return $query->where('session_id', $sessionId);
     }
 
     /**
-     * Update quantity (with stock validation)
+     * Scope to filter by user ID
      */
-    public function updateQuantity(int $quantity): bool
+    public function scopeForUser($query, ?int $userId)
     {
-        $availableStock = $this->getAvailableStock();
-
-        if ($quantity > $availableStock) {
-            return false;
-        }
-
-        $this->update(['quantity' => $quantity]);
-        return true;
-    }
-
-    /**
-     * Increment quantity
-     */
-    public function incrementQuantity(int $amount = 1): bool
-    {
-        return $this->updateQuantity($this->quantity + $amount);
-    }
-
-    /**
-     * Get cart item display name
-     */
-    public function getDisplayName(): string
-    {
-        $name = $this->product->name;
-
-        if ($this->variant) {
-            $name .= ' - ' . $this->variant->getVariantName();
-        }
-
-        return $name;
+        return $query->where('user_id', $userId);
     }
 }

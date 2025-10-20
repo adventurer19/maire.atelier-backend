@@ -1,4 +1,5 @@
 <?php
+// app/Http/Resources/CategoryResource.php
 
 namespace App\Http\Resources;
 
@@ -7,13 +8,16 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class CategoryResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        return [
+            'id' => $this->id,
+            'slug' => $this->slug,
+            'name' => $this->name,
+            'description' => $this->description,
+//            'image' => $this->getFirstMediaUrl('images'),
+            'parent_id' => $this->parent_id,
+            'position' => $this->position,
+        ];
     }
 }

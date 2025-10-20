@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+echo "🚀 List routes"
+
+
+./vendor/bin/sail artisan route:list

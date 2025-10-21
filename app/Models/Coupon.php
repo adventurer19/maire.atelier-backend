@@ -6,12 +6,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
+// ============================================
+// COUPON MODEL
+// ============================================
+
 class Coupon extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'code',
+        'description',
         'type',
         'value',
         'min_purchase_amount',
@@ -20,6 +25,7 @@ class Coupon extends Model
         'usage_count',
         'valid_from',
         'valid_to',
+        'applies_to', // 'all', 'category', 'product'
         'is_active',
     ];
 
@@ -34,99 +40,114 @@ class Coupon extends Model
         'is_active' => 'boolean',
     ];
 
-    const TYPE_PERCENTAGE = 'percentage';
-    const TYPE_FIXED = 'fixed';
+    public const TYPE_PERCENTAGE = 'percentage';
+    public const TYPE_FIXED = 'fixed';
 
     // ============================================
     // RELATIONSHIPS
     // ============================================
 
+    /**
+     * Orders using this coupon
+     */
     public function orders(): BelongsToMany
     {
         return $this->belongsToMany(Order::class, 'order_coupons')
-            ->withPivot('discount_amount');
+            ->withPivot('discount_amount')
+            ->withTimestamps();
     }
 
     // ============================================
     // SCOPES
     // ============================================
 
+    /**
+     * Active coupons only
+     */
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
     /**
-     * Scope to only valid coupons (active, within date range, not exhausted)
+     * Coupons that are valid for current date and usage count
      */
     public function scopeValid($query)
     {
         return $query->where('is_active', true)
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->whereNull('valid_from')
                     ->orWhere('valid_from', '<=', now());
             })
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->whereNull('valid_to')
                     ->orWhere('valid_to', '>=', now());
             })
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->whereNull('usage_limit')
                     ->orWhereRaw('usage_count < usage_limit');
             });
     }
 
     // ============================================
-    // VALIDATION
+    // VALIDATION HELPERS
     // ============================================
 
     /**
-     * Check if coupon is valid
+     * Check if coupon is currently valid
      */
     public function isValid(): bool
     {
-        if (!$this->is_active) return false;
+        if (! $this->is_active) {
+            return false;
+        }
 
-        if ($this->valid_from && now()->lt($this->valid_from)) return false;
-        if ($this->valid_to && now()->gt($this->valid_to)) return false;
+        if ($this->valid_from && now()->lt($this->valid_from)) {
+            return false;
+        }
 
-        if ($this->usage_limit && $this->usage_count >= $this->usage_limit) return false;
+        if ($this->valid_to && now()->gt($this->valid_to)) {
+            return false;
+        }
+
+        if ($this->hasUsageLimit() && $this->usage_count >= $this->usage_limit) {
+            return false;
+        }
 
         return true;
     }
 
     /**
-     * Check if coupon can apply to amount
+     * Check if coupon can be applied to a subtotal amount
      */
-    public function canApplyToAmount(float $amount): bool
+    public function canApplyToAmount(float $subtotal): bool
     {
-        return !$this->min_purchase_amount || $amount >= $this->min_purchase_amount;
+        return ! $this->min_purchase_amount || $subtotal >= $this->min_purchase_amount;
     }
 
     /**
-     * Calculate discount for given subtotal
+     * Calculate discount based on coupon type
      */
     public function calculateDiscount(float $subtotal): float
     {
-        if ($this->type === self::TYPE_PERCENTAGE) {
-            $discount = ($subtotal * $this->value) / 100;
-        } else {
-            $discount = $this->value;
-        }
+        $discount = $this->isPercentage()
+            ? ($subtotal * ($this->value / 100))
+            : $this->value;
 
-        // Cap at max discount if set
         if ($this->max_discount_amount) {
             $discount = min($discount, $this->max_discount_amount);
         }
 
-        // Don't exceed subtotal
-        $discount = min($discount, $subtotal);
-
-        return round($discount, 2);
+        // Ensure discount never exceeds subtotal
+        return round(min($discount, $subtotal), 2);
     }
 
+    // ============================================
+    // COUNTERS
+    // ============================================
+
     /**
-     * Increment usage count
+     * Increment coupon usage count
      */
     public function incrementUsage(): void
     {
@@ -134,7 +155,7 @@ class Coupon extends Model
     }
 
     /**
-     * Decrement usage count (for cancelled orders)
+     * Decrement usage (e.g. cancelled order)
      */
     public function decrementUsage(): void
     {
@@ -143,57 +164,70 @@ class Coupon extends Model
         }
     }
 
-    /**
-     * Check if coupon is percentage type
-     */
+    // ============================================
+    // TYPE CHECKS
+    // ============================================
+
     public function isPercentage(): bool
     {
         return $this->type === self::TYPE_PERCENTAGE;
     }
 
-    /**
-     * Check if coupon is fixed type
-     */
     public function isFixed(): bool
     {
         return $this->type === self::TYPE_FIXED;
     }
 
-    /**
-     * Get formatted discount value
-     */
-    public function getFormattedValue(): string
-    {
-        if ($this->isPercentage()) {
-            return $this->value . '%';
-        }
-        return number_format($this->value, 2) . ' BGN';
-    }
+    // ============================================
+    // LIMIT HELPERS
+    // ============================================
 
-    /**
-     * Check if coupon has usage limit
-     */
     public function hasUsageLimit(): bool
     {
         return $this->usage_limit !== null;
     }
 
-    /**
-     * Get remaining uses
-     */
     public function getRemainingUses(): ?int
     {
-        if (!$this->hasUsageLimit()) {
+        if (! $this->hasUsageLimit()) {
             return null;
         }
+
         return max(0, $this->usage_limit - $this->usage_count);
     }
 
-    /**
-     * Check if coupon is exhausted
-     */
     public function isExhausted(): bool
     {
         return $this->hasUsageLimit() && $this->usage_count >= $this->usage_limit;
+    }
+
+    // ============================================
+    // ACCESSORS / HELPERS
+    // ============================================
+
+    /**
+     * Get formatted coupon value (for display)
+     */
+    public function getFormattedValueAttribute(): string
+    {
+        return $this->isPercentage()
+            ? "{$this->value}%"
+            : number_format($this->value, 2) . ' BGN';
+    }
+
+    /**
+     * Display full name with code + value
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        return strtoupper($this->code) . ' (' . $this->formatted_value . ')';
+    }
+
+    /**
+     * Check if coupon applies to all products
+     */
+    public function appliesToAll(): bool
+    {
+        return $this->applies_to === 'all' || empty($this->applies_to);
     }
 }

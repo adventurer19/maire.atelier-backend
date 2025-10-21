@@ -6,10 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+// ============================================
+// ORDER ADDRESS MODEL (Shipping / Billing)
+// ============================================
+
 class OrderAddress extends Model
 {
     use HasFactory;
-
 
     protected $fillable = [
         'order_id',
@@ -27,29 +30,57 @@ class OrderAddress extends Model
         'email',
     ];
 
-    // ============================================
-    // RELATIONSHIPS
-    // ============================================
+    protected $casts = [
+        'order_id' => 'integer',
+    ];
 
+    // --------------------------------------------
+    // CONSTANTS
+    // --------------------------------------------
+
+    public const TYPE_SHIPPING = 'shipping';
+    public const TYPE_BILLING  = 'billing';
+
+    // --------------------------------------------
+    // RELATIONSHIPS
+    // --------------------------------------------
+
+    /**
+     * The order this address belongs to
+     */
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
     }
 
-    // ============================================
+    // --------------------------------------------
+    // SCOPES
+    // --------------------------------------------
+
+    public function scopeShipping($query)
+    {
+        return $query->where('type', self::TYPE_SHIPPING);
+    }
+
+    public function scopeBilling($query)
+    {
+        return $query->where('type', self::TYPE_BILLING);
+    }
+
+    // --------------------------------------------
     // ACCESSORS
-    // ============================================
+    // --------------------------------------------
 
     /**
-     * Get full name
+     * Full customer name
      */
     public function getFullNameAttribute(): string
     {
-        return trim("{$this->first_name} {$this->last_name}");
+        return trim(($this->first_name ?? '') . ' ' . ($this->last_name ?? ''));
     }
 
     /**
-     * Get full formatted address
+     * Full formatted address
      */
     public function getFullAddressAttribute(): string
     {
@@ -65,23 +96,25 @@ class OrderAddress extends Model
         return implode(', ', $parts);
     }
 
-    // ============================================
-    // HELPERS
-    // ============================================
-
     /**
-     * Check if this is shipping address
+     * Compact single-line label for dropdowns or invoices
      */
-    public function isShipping(): bool
+    public function getFormattedLabelAttribute(): string
     {
-        return $this->type === 'shipping';
+        return $this->full_name . ' — ' . $this->getFullAddressAttribute();
     }
 
-    /**
-     * Check if this is billing address
-     */
+    // --------------------------------------------
+    // HELPERS
+    // --------------------------------------------
+
+    public function isShipping(): bool
+    {
+        return $this->type === self::TYPE_SHIPPING;
+    }
+
     public function isBilling(): bool
     {
-        return $this->type === 'billing';
+        return $this->type === self::TYPE_BILLING;
     }
 }

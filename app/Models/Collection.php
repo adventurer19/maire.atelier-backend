@@ -9,10 +9,17 @@ use Spatie\Translatable\HasTranslations;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
+// ============================================
+// COLLECTION MODEL (Manual / Automatic)
+// ============================================
+
 class Collection extends Model
 {
-    use HasTranslations, HasSlug, HasFactory;
+    use HasFactory, HasTranslations, HasSlug;
 
+    /**
+     * Fillable attributes.
+     */
     protected $fillable = [
         'slug',
         'name',
@@ -20,10 +27,16 @@ class Collection extends Model
         'meta_title',
         'meta_description',
         'type',
+        'image',
         'is_active',
+        'is_featured',
         'position',
+        'conditions', // JSON rules for auto collections
     ];
 
+    /**
+     * Translatable attributes.
+     */
     public $translatable = [
         'name',
         'description',
@@ -31,38 +44,43 @@ class Collection extends Model
         'meta_description',
     ];
 
+    /**
+     * Cast definitions.
+     */
     protected $casts = [
         'is_active' => 'boolean',
+        'is_featured' => 'boolean',
         'position' => 'integer',
+        'conditions' => 'array',
     ];
 
-    const TYPE_MANUAL = 'manual';
-    const TYPE_AUTO = 'auto';
+    public const TYPE_MANUAL = 'manual';
+    public const TYPE_AUTO = 'auto';
 
-    /**
-     * Get the options for generating the slug.
-     */
+    // -------------------------------------------------------------------------
+    // ⚙️ SLUG CONFIGURATION
+    // -------------------------------------------------------------------------
+
     public function getSlugOptions(): SlugOptions
     {
         return SlugOptions::create()
-            ->generateSlugsFrom('name')
-            ->saveSlugsTo('slug');
+            ->generateSlugsFrom(fn ($model) => $model->getTranslation('name', app()->getLocale()))
+            ->saveSlugsTo('slug')
+            ->slugsShouldBeNoLongerThan(255)
+            ->doNotGenerateSlugsOnUpdate();
     }
 
-    /**
-     * Get the route key for the model.
-     */
     public function getRouteKeyName(): string
     {
         return 'slug';
     }
 
-    // ============================================
-    // RELATIONSHIPS
-    // ============================================
+    // -------------------------------------------------------------------------
+    // 🔗 RELATIONSHIPS
+    // -------------------------------------------------------------------------
 
     /**
-     * Products in this collection (with manual position sorting)
+     * Products in this collection (ordered by pivot position)
      */
     public function products(): BelongsToMany
     {
@@ -71,9 +89,9 @@ class Collection extends Model
             ->orderBy('collection_products.position');
     }
 
-    // ============================================
-    // SCOPES
-    // ============================================
+    // -------------------------------------------------------------------------
+    // 🔍 SCOPES
+    // -------------------------------------------------------------------------
 
     public function scopeActive($query)
     {
@@ -83,6 +101,11 @@ class Collection extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('position');
+    }
+
+    public function scopeFeatured($query)
+    {
+        return $query->where('is_featured', true);
     }
 
     public function scopeManual($query)
@@ -95,12 +118,12 @@ class Collection extends Model
         return $query->where('type', self::TYPE_AUTO);
     }
 
-    // ============================================
-    // HELPERS
-    // ============================================
+    // -------------------------------------------------------------------------
+    // 💡 HELPERS
+    // -------------------------------------------------------------------------
 
     /**
-     * Check if collection is manual
+     * Check if collection is manual.
      */
     public function isManual(): bool
     {
@@ -108,7 +131,7 @@ class Collection extends Model
     }
 
     /**
-     * Check if collection is auto
+     * Check if collection is automatic.
      */
     public function isAuto(): bool
     {
@@ -116,31 +139,29 @@ class Collection extends Model
     }
 
     /**
-     * Get products count
+     * Get total product count in the collection.
      */
-    public function getProductsCount(): int
+    public function getProductsCountAttribute(): int
     {
         return $this->products()->count();
     }
 
     /**
-     * Add product to collection (manual only)
+     * Add product to manual collection.
      */
     public function addProduct(Product $product, int $position = null): void
     {
-        if (!$this->isManual()) {
-            throw new \Exception('Can only add products to manual collections');
+        if (! $this->isManual()) {
+            throw new \LogicException('Can only add products to manual collections.');
         }
 
-        if ($position === null) {
-            $position = $this->products()->max('collection_products.position') + 1;
-        }
+        $position ??= ($this->products()->max('collection_products.position') ?? 0) + 1;
 
         $this->products()->attach($product->id, ['position' => $position]);
     }
 
     /**
-     * Remove product from collection
+     * Remove a product from the collection.
      */
     public function removeProduct(Product $product): void
     {
@@ -148,18 +169,47 @@ class Collection extends Model
     }
 
     /**
-     * Reorder products in collection
+     * Reorder products in manual collection.
      */
     public function reorderProducts(array $productIdsInOrder): void
     {
-        if (!$this->isManual()) {
-            throw new \Exception('Can only reorder manual collections');
+        if (! $this->isManual()) {
+            throw new \LogicException('Can only reorder manual collections.');
         }
 
         foreach ($productIdsInOrder as $position => $productId) {
-            $this->products()->updateExistingPivot($productId, [
-                'position' => $position
-            ]);
+            $this->products()->updateExistingPivot($productId, ['position' => $position + 1]);
         }
+    }
+
+    /**
+     * Get image URL (local or S3 ready)
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! $this->image) {
+            return null;
+        }
+
+        return str_starts_with($this->image, 'http')
+            ? $this->image
+            : asset('storage/' . $this->image);
+    }
+
+    /**
+     * Get meta title with fallback to name.
+     */
+    public function getMetaTitleAttribute(): string
+    {
+        return $this->getTranslation('meta_title', app()->getLocale())
+            ?: $this->getTranslation('name', app()->getLocale());
+    }
+
+    /**
+     * Get short description for cards/lists.
+     */
+    public function getShortDescriptionAttribute(): string
+    {
+        return str($this->getTranslation('description', app()->getLocale()))->limit(120);
     }
 }

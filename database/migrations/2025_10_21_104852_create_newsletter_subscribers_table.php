@@ -10,14 +10,20 @@ return new class extends Migration
     {
         Schema::create('newsletter_subscribers', function (Blueprint $table) {
             $table->id();
+
+            // 📧 Email address
             $table->string('email')->unique();
-            $table->boolean('is_active')->default(true);
+
+            // 🏷️ Subscription status
             $table->enum('status', ['subscribed', 'unsubscribed'])->default('subscribed');
-            $table->timestamp('subscribed_at')->useCurrent();
+
+            // 🕓 Timeline
+            $table->timestamp('subscribed_at')->nullable();
             $table->timestamp('unsubscribed_at')->nullable();
+
             $table->timestamps();
 
-            $table->index('email');
+            // 🔍 Index for quick status lookups
             $table->index('status');
         });
     }

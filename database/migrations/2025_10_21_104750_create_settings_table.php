@@ -10,12 +10,17 @@ return new class extends Migration
     {
         Schema::create('settings', function (Blueprint $table) {
             $table->id();
-            $table->string('key', 100)->unique();
-            $table->text('value')->nullable();
-            $table->enum('type', ['string', 'number', 'boolean', 'json'])->default('string');
-            $table->timestamps();
 
-            $table->index('key');
+            // 🔑 Unique key name (e.g., "site_name", "currency", "tax_rate")
+            $table->string('key')->unique();
+
+            // 🧩 Value stored as string (can be JSON, number, boolean, etc.)
+            $table->text('value')->nullable();
+
+            // 📘 Type hint for casting ('string', 'number', 'boolean', 'json')
+            $table->enum('type', ['string', 'number', 'boolean', 'json'])->default('string');
+
+            $table->timestamps();
         });
     }
 

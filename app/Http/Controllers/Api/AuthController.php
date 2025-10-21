@@ -3,18 +3,20 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ApiResponse;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    use ApiResponse;
+
     /**
-     * Register a new user
      * POST /api/register
+     * Register a new user and issue an API token.
      */
     public function register(Request $request): JsonResponse
     {
@@ -25,107 +27,100 @@ class AuthController extends Controller
         ]);
 
         $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
+            'name'     => $validated['name'],
+            'email'    => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => 'customer', // Default role
+            'role'     => 'customer', // Default role
         ]);
 
-        // Create token
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Registration successful',
+        return $this->created([
             'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
+                'id'    => $user->id,
+                'name'  => $user->name,
                 'email' => $user->email,
-                'role' => $user->role->value,
+                'role'  => $user->role->value ?? $user->role, // fallback if not enum
             ],
             'token' => $token,
-        ], 201);
+        ]);
     }
 
     /**
-     * Login user
      * POST /api/login
+     * Authenticate a user and issue a new token.
      */
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+            'email'    => 'required|email',
+            'password' => 'required|string',
         ]);
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
+        // Invalid credentials
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            return $this->error('INVALID_CREDENTIALS', __('auth.failed'), [
                 'email' => ['The provided credentials are incorrect.'],
-            ]);
+            ], 422);
         }
 
-        // Revoke old tokens (optional)
+        // Create new token (optionally revoke previous ones)
         // $user->tokens()->delete();
-
-        // Create new token
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Login successful',
+        return $this->ok([
             'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
+                'id'    => $user->id,
+                'name'  => $user->name,
                 'email' => $user->email,
-                'role' => $user->role->value,
+                'role'  => $user->role->value ?? $user->role,
             ],
             'token' => $token,
         ]);
     }
 
     /**
-     * Logout user (revoke token)
      * POST /api/logout
+     * Revoke the current API token.
      */
     public function logout(Request $request): JsonResponse
     {
-        // Revoke current token
-        $request->user()->currentAccessToken()->delete();
+        $token = $request->user()->currentAccessToken();
+        if ($token) {
+            $token->delete();
+        }
 
-        return response()->json([
-            'message' => 'Logout successful',
-        ]);
+        return $this->ok(['message' => __('Logged out successfully')]);
     }
 
     /**
-     * Get current authenticated user
      * GET /api/user
+     * Retrieve the currently authenticated user's details.
      */
     public function user(Request $request): JsonResponse
     {
-        return response()->json([
-            'data' => [
-                'id' => $request->user()->id,
-                'name' => $request->user()->name,
-                'email' => $request->user()->email,
-                'role' => $request->user()->role->value,
-                'email_verified_at' => $request->user()->email_verified_at,
-                'created_at' => $request->user()->created_at,
-            ],
+        $user = $request->user();
+
+        return $this->ok([
+            'id'               => $user->id,
+            'name'             => $user->name,
+            'email'            => $user->email,
+            'role'             => $user->role->value ?? $user->role,
+            'email_verified_at'=> $user->email_verified_at,
+            'created_at'       => $user->created_at,
         ]);
     }
 
     /**
-     * Revoke all tokens for user
      * POST /api/logout-all
+     * Revoke all issued API tokens for the authenticated user.
      */
     public function logoutAll(Request $request): JsonResponse
     {
-        // Revoke all tokens
         $request->user()->tokens()->delete();
 
-        return response()->json([
-            'message' => 'All sessions logged out successfully',
-        ]);
+        return $this->ok(['message' => __('All sessions revoked successfully')]);
     }
 }

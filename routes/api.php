@@ -1,7 +1,13 @@
 <?php
 
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+// Controllers
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CollectionController;
@@ -16,45 +22,45 @@ use App\Http\Controllers\Api\AddressController;
 |--------------------------------------------------------------------------
 | Base URL: http://maire.atelier.test/api
 |--------------------------------------------------------------------------
+| Sanctum is used for auth (Bearer Token)
+|--------------------------------------------------------------------------
 */
 
 // ============================================
 // PUBLIC ROUTES
 // ============================================
 
-// Health check
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'ok',
-        'timestamp' => now()->toIso8601String(),
-        'locale' => app()->getLocale(),
-        'version' => '1.0.0',
-    ]);
-});
+// 🩺 Health check
+Route::get('/health', fn() => response()->json([
+    'status' => 'ok',
+    'timestamp' => now()->toIso8601String(),
+    'locale' => app()->getLocale(),
+    'version' => '1.0.0',
+]));
 
-// Products
+// 🛍️ Products
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::get('/featured', [ProductController::class, 'featured']);
     Route::get('/{product:slug}', [ProductController::class, 'show']);
 });
 
-// Categories
+// 🗂️ Categories
 Route::prefix('categories')->group(function () {
     Route::get('/', [CategoryController::class, 'index']);
     Route::get('/{category:slug}', [CategoryController::class, 'show']);
 });
 
-// Collections
+// 🎯 Collections
 Route::prefix('collections')->group(function () {
     Route::get('/', [CollectionController::class, 'index']);
     Route::get('/{collection:slug}', [CollectionController::class, 'show']);
 });
 
-// Search
+// 🔍 Search
 Route::get('/search', [ProductController::class, 'search']);
 
-// Cart - Public (works for guests with session)
+// 🛒 Cart (guest or authenticated)
 Route::prefix('cart')->group(function () {
     Route::get('/', [CartController::class, 'index']);
     Route::get('/count', [CartController::class, 'count']);
@@ -62,30 +68,32 @@ Route::prefix('cart')->group(function () {
     Route::put('/items/{item}', [CartController::class, 'updateItem']);
     Route::delete('/items/{item}', [CartController::class, 'removeItem']);
     Route::delete('/', [CartController::class, 'clear']);
-    Route::post('/validate', [CartController::class, 'validate']);
+    Route::post('/validate', [CartController::class, 'validateCart']);
 });
 
 // ============================================
-// AUTHENTICATED ROUTES
+// AUTH ROUTES (Sanctum Bearer Token)
 // ============================================
+
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
-    // Current user profile
-    Route::get('/user', function (Request $request) {
-        return response()->json([
-            'data' => $request->user()->load('addresses'),
-        ]);
-    });
+    // 👤 Current user
+    Route::get('/user', [AuthController::class, 'user']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/logout-all', [AuthController::class, 'logoutAll']);
 
-    // Orders
+    // 📦 Orders
     Route::prefix('orders')->group(function () {
         Route::get('/', [OrderController::class, 'index']);
-        Route::post('/', [OrderController::class, 'store']);
         Route::get('/{order}', [OrderController::class, 'show']);
+        Route::post('/', [OrderController::class, 'store']);
+        Route::post('/{order}/cancel', [OrderController::class, 'cancel']); // добавено от OrderService
     });
 
-    // Wishlist
+    // ❤️ Wishlist
     Route::prefix('wishlist')->group(function () {
         Route::get('/', [WishlistController::class, 'index']);
         Route::post('/', [WishlistController::class, 'add']);
@@ -93,50 +101,38 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/toggle/{product}', [WishlistController::class, 'toggle']);
     });
 
-    // Addresses
+    // 🏠 Addresses
     Route::apiResource('addresses', AddressController::class);
 });
 
 // ============================================
-// ADMIN ROUTES
+// ADMIN ROUTES (Protected by 'admin' middleware)
 // ============================================
 
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
 
-    // Dashboard stats
-    Route::get('/dashboard/stats', function () {
-        return response()->json([
-            'message' => 'Admin Dashboard Stats',
-            'data' => [
-                'total_orders' => \App\Models\Order::count(),
-                'total_products' => \App\Models\Product::count(),
-                'total_users' => \App\Models\User::count(),
-            ],
-        ]);
-    });
+    Route::get('/dashboard/stats', fn() => response()->json([
+        'message' => 'Admin Dashboard Stats',
+        'data' => [
+            'total_orders' => Order::count(),
+            'total_products' => Product::count(),
+            'total_users' => User::count(),
+        ],
+    ]));
 
-    // Export
-    Route::get('/orders/export', function () {
-        return response()->json(['message' => 'Orders export functionality']);
-    });
+    // Exports
+    Route::get('/orders/export', fn() => response()->json(['message' => 'Orders export endpoint']));
+    Route::get('/products/export', fn() => response()->json(['message' => 'Products export endpoint']));
 
-    Route::get('/products/export', function () {
-        return response()->json(['message' => 'Products export functionality']);
-    });
-
-    // Bulk operations
-    Route::post('/products/bulk-update', function () {
-        return response()->json(['message' => 'Products bulk update functionality']);
-    });
+    // Bulk actions
+    Route::post('/products/bulk-update', fn() => response()->json(['message' => 'Products bulk update endpoint']));
 });
 
 // ============================================
 // FALLBACK - 404
 // ============================================
 
-Route::fallback(function () {
-    return response()->json([
-        'message' => 'Endpoint not found',
-        'error' => 'ROUTE_NOT_FOUND',
-    ], 404);
-});
+Route::fallback(fn() => response()->json([
+    'error' => 'ROUTE_NOT_FOUND',
+    'message' => 'The requested endpoint does not exist.',
+], 404));

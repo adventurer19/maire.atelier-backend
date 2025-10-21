@@ -10,17 +10,16 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+// ============================================
+// USER MODEL
+// ============================================
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasApiTokens;
 
     /**
-     *
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
+     * Attributes that are mass assignable.
      */
     protected $fillable = [
         'name',
@@ -30,9 +29,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
+     * Attributes that should be hidden.
      */
     protected $hidden = [
         'password',
@@ -40,27 +37,34 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Attribute casting.
      */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'role' => UserRole::class
+            'password'          => 'hashed',
+            'role'              => UserRole::class,
         ];
     }
 
+    // ============================================
+    // FILAMENT ACCESS CONTROL
+    // ============================================
+
     /**
      * Determine if user can access Filament admin panel
-     * ✅ Само admins могат да влязат в Filament
+     * ✅ Only admins can log in
      */
     public function canAccessPanel(Panel $panel): bool
     {
         return $this->isAdmin();
     }
+
+    // ============================================
+    // RELATIONSHIPS
+    // ============================================
+
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class)->latest();
@@ -104,5 +108,49 @@ class User extends Authenticatable
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
+    }
+
+    // ============================================
+    // ROLE HELPERS
+    // ============================================
+
+    /**
+     * Check if user is admin
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === UserRole::Admin;
+    }
+
+    /**
+     * Check if user is customer
+     */
+    public function isCustomer(): bool
+    {
+        return $this->role === UserRole::Customer;
+    }
+
+    /**
+     * Check if user is editor / manager (optional)
+     */
+    public function isEditor(): bool
+    {
+        return $this->role === UserRole::Editor;
+    }
+
+    /**
+     * Get formatted display name
+     */
+    public function getDisplayName(): string
+    {
+        return $this->name ?: __('Guest');
+    }
+
+    /**
+     * Check if user is a guest (not authenticated)
+     */
+    public function isGuest(): bool
+    {
+        return !$this->exists;
     }
 }

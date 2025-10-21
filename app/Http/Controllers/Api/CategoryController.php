@@ -3,47 +3,50 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * GET /api/categories
+     * Returns all active categories with basic info
      */
     public function index()
     {
-        //
+        $categories = Category::query()
+            ->where('is_active', true)
+            ->withCount('products')
+            ->orderBy('position')
+            ->get([
+                'id',
+                'name',
+                'slug',
+                'description',
+                'image',
+                'parent_id',
+            ]);
+
+        return response()->json([
+            'data' => $categories,
+        ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * GET /api/categories/{slug}
+     * Returns a single category with its products
      */
-    public function store(Request $request)
+    public function show(string $slug)
     {
-        //
-    }
+        $category = Category::where('slug', $slug)
+            ->with(['products' => function ($query) {
+                $query->where('is_active', true)
+                    ->with(['images', 'variants']);
+            }])
+            ->firstOrFail();
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return response()->json([
+            'data' => $category,
+        ]);
     }
 }

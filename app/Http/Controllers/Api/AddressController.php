@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ApiResponse;
 use App\Http\Resources\AddressResource;
 use App\Models\Address;
 use Illuminate\Http\Request;
@@ -11,9 +12,11 @@ use Illuminate\Validation\Rule;
 
 class AddressController extends Controller
 {
+    use ApiResponse;
+
     /**
-     * Display a listing of user's addresses.
      * GET /api/addresses
+     * List all addresses for the authenticated user.
      */
     public function index(Request $request): JsonResponse
     {
@@ -23,14 +26,12 @@ class AddressController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return response()->json([
-            'data' => AddressResource::collection($addresses),
-        ]);
+        return $this->ok(AddressResource::collection($addresses));
     }
 
     /**
-     * Store a newly created address.
      * POST /api/addresses
+     * Create a new address for the authenticated user.
      */
     public function store(Request $request): JsonResponse
     {
@@ -44,56 +45,46 @@ class AddressController extends Controller
             'city' => 'required|string|max:100',
             'state' => 'nullable|string|max:100',
             'postal_code' => 'required|string|max:20',
-            'country' => 'required|string|size:2', // ISO code (BG, US, etc)
+            'country' => 'required|string|size:2',
             'phone' => 'nullable|string|max:50',
             'is_default' => 'boolean',
         ]);
 
         $validated['user_id'] = $request->user()->id;
-
         $address = Address::create($validated);
 
-        // Ако е маркиран като default, премахни default от останалите
+        // If new address is marked as default, reset others
         if ($address->is_default) {
             $address->setAsDefault();
         }
 
-        return response()->json([
-            'message' => __('Address created successfully'),
-            'data' => new AddressResource($address),
-        ], 201);
+        return $this->created(new AddressResource($address));
     }
 
     /**
-     * Display the specified address.
      * GET /api/addresses/{id}
+     * Retrieve a specific address by ID (must belong to current user).
      */
     public function show(Request $request, Address $address): JsonResponse
     {
-        // Провери дали адреса принадлежи на текущия user
         if ($address->user_id !== $request->user()->id) {
-            return response()->json([
-                'message' => 'Forbidden',
-                'error' => 'ADDRESS_NOT_OWNED',
+            return $this->error('FORBIDDEN', __('auth.forbidden'), [
+                'address_id' => $address->id,
             ], 403);
         }
 
-        return response()->json([
-            'data' => new AddressResource($address),
-        ]);
+        return $this->ok(new AddressResource($address));
     }
 
     /**
-     * Update the specified address.
      * PUT /api/addresses/{id}
+     * Update an existing address (only if owned by user).
      */
     public function update(Request $request, Address $address): JsonResponse
     {
-        // Провери ownership
         if ($address->user_id !== $request->user()->id) {
-            return response()->json([
-                'message' => 'Forbidden',
-                'error' => 'ADDRESS_NOT_OWNED',
+            return $this->error('FORBIDDEN', __('auth.forbidden'), [
+                'address_id' => $address->id,
             ], 403);
         }
 
@@ -114,38 +105,31 @@ class AddressController extends Controller
 
         $address->update($validated);
 
-        // Ако е маркиран като default, премахни default от останалите
         if (isset($validated['is_default']) && $validated['is_default']) {
             $address->setAsDefault();
         }
 
-        return response()->json([
-            'message' => __('Address updated successfully'),
-            'data' => new AddressResource($address->fresh()),
-        ]);
+        return $this->ok(new AddressResource($address->fresh()));
     }
 
     /**
-     * Remove the specified address.
      * DELETE /api/addresses/{id}
+     * Delete a specific address if owned by user.
      */
     public function destroy(Request $request, Address $address): JsonResponse
     {
-        // Провери ownership
         if ($address->user_id !== $request->user()->id) {
-            return response()->json([
-                'message' => 'Forbidden',
-                'error' => 'ADDRESS_NOT_OWNED',
+            return $this->error('FORBIDDEN', __('auth.forbidden'), [
+                'address_id' => $address->id,
             ], 403);
         }
 
-        // Запази type и is_default преди изтриване
         $wasDefault = $address->is_default;
         $type = $address->type;
 
         $address->delete();
 
-        // Ако изтритият адрес е бил default, направи друг адрес default
+        // If deleted address was default, assign a new default of same type
         if ($wasDefault) {
             $newDefault = Address::where('user_id', $request->user()->id)
                 ->where('type', $type)
@@ -156,36 +140,29 @@ class AddressController extends Controller
             }
         }
 
-        return response()->json([
-            'message' => __('Address deleted successfully'),
-        ]);
+        return $this->ok(['message' => __('Address deleted successfully')]);
     }
 
     /**
-     * Set address as default.
      * POST /api/addresses/{id}/set-default
+     * Mark the specified address as default for its type.
      */
     public function setDefault(Request $request, Address $address): JsonResponse
     {
-        // Провери ownership
         if ($address->user_id !== $request->user()->id) {
-            return response()->json([
-                'message' => 'Forbidden',
-                'error' => 'ADDRESS_NOT_OWNED',
+            return $this->error('FORBIDDEN', __('auth.forbidden'), [
+                'address_id' => $address->id,
             ], 403);
         }
 
         $address->setAsDefault();
 
-        return response()->json([
-            'message' => __('Default address updated'),
-            'data' => new AddressResource($address->fresh()),
-        ]);
+        return $this->ok(new AddressResource($address->fresh()));
     }
 
     /**
-     * Get default shipping address.
      * GET /api/addresses/default/shipping
+     * Get the user's default shipping address.
      */
     public function defaultShipping(Request $request): JsonResponse
     {
@@ -195,21 +172,18 @@ class AddressController extends Controller
             ->default()
             ->first();
 
-        if (!$address) {
-            return response()->json([
-                'message' => 'No default shipping address found',
-                'data' => null,
+        if (! $address) {
+            return $this->error('NOT_FOUND', __('common.not_found'), [
+                'type' => 'shipping'
             ], 404);
         }
 
-        return response()->json([
-            'data' => new AddressResource($address),
-        ]);
+        return $this->ok(new AddressResource($address));
     }
 
     /**
-     * Get default billing address.
      * GET /api/addresses/default/billing
+     * Get the user's default billing address.
      */
     public function defaultBilling(Request $request): JsonResponse
     {
@@ -219,15 +193,12 @@ class AddressController extends Controller
             ->default()
             ->first();
 
-        if (!$address) {
-            return response()->json([
-                'message' => 'No default billing address found',
-                'data' => null,
+        if (! $address) {
+            return $this->error('NOT_FOUND', __('common.not_found'), [
+                'type' => 'billing'
             ], 404);
         }
 
-        return response()->json([
-            'data' => new AddressResource($address),
-        ]);
+        return $this->ok(new AddressResource($address));
     }
 }

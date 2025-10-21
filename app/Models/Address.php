@@ -28,27 +28,28 @@ class Address extends Model
         'country',
         'phone',
         'is_default',
+        'email', // ✅ Useful for guest checkouts
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
     ];
 
-    const TYPE_SHIPPING = 'shipping';
-    const TYPE_BILLING = 'billing';
+    public const TYPE_SHIPPING = 'shipping';
+    public const TYPE_BILLING = 'billing';
 
-    // ============================================
-    // RELATIONSHIPS
-    // ============================================
+    // -------------------------------------------------------------------------
+    // 🔗 RELATIONS
+    // -------------------------------------------------------------------------
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    // ============================================
-    // SCOPES
-    // ============================================
+    // -------------------------------------------------------------------------
+    // 🔍 SCOPES
+    // -------------------------------------------------------------------------
 
     public function scopeShipping($query)
     {
@@ -65,9 +66,9 @@ class Address extends Model
         return $query->where('is_default', true);
     }
 
-    // ============================================
-    // ACCESSORS
-    // ============================================
+    // -------------------------------------------------------------------------
+    // 🧠 ACCESSORS
+    // -------------------------------------------------------------------------
 
     public function getFullNameAttribute(): string
     {
@@ -88,18 +89,40 @@ class Address extends Model
         return implode(', ', $parts);
     }
 
-    // ============================================
-    // HELPERS
-    // ============================================
+    public function getTypeLabelAttribute(): string
+    {
+        return ucfirst($this->type);
+    }
 
+    // -------------------------------------------------------------------------
+    // ⚙️ HELPERS
+    // -------------------------------------------------------------------------
+
+    /**
+     * Mark this address as the default for its type.
+     */
     public function setAsDefault(): void
     {
-        // Remove default from other addresses of same type
-        self::where('user_id', $this->user_id)
+        static::where('user_id', $this->user_id)
             ->where('type', $this->type)
             ->where('id', '!=', $this->id)
             ->update(['is_default' => false]);
 
         $this->update(['is_default' => true]);
+    }
+
+    /**
+     * Convert address to a simple string for order summary / emails.
+     */
+    public function toSummaryString(): string
+    {
+        return sprintf(
+            "%s\n%s\n%s %s\n%s",
+            $this->full_name,
+            $this->address_line1,
+            $this->postal_code,
+            $this->city,
+            $this->country
+        );
     }
 }

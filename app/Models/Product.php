@@ -4,13 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\Translatable\HasTranslations;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+
+// ============================================
+// PRODUCT MODEL
+// ============================================
 
 class Product extends Model implements HasMedia
 {
@@ -53,25 +57,29 @@ class Product extends Model implements HasMedia
     ];
 
     protected $casts = [
-        'price' => 'decimal:2',
-        'compare_at_price' => 'decimal:2',
-        'cost_price' => 'decimal:2',
-        'is_active' => 'boolean',
-        'is_featured' => 'boolean',
-        'is_taxable' => 'boolean',
-        'requires_shipping' => 'boolean',
-        'stock_quantity' => 'integer',
+        'price'               => 'decimal:2',
+        'compare_at_price'    => 'decimal:2',
+        'cost_price'          => 'decimal:2',
+        'is_active'           => 'boolean',
+        'is_featured'         => 'boolean',
+        'is_taxable'          => 'boolean',
+        'requires_shipping'   => 'boolean',
+        'stock_quantity'      => 'integer',
         'low_stock_threshold' => 'integer',
-        'weight' => 'decimal:2',
-        'width' => 'decimal:2',
-        'height' => 'decimal:2',
-        'depth' => 'decimal:2',
+        'weight'              => 'decimal:2',
+        'width'               => 'decimal:2',
+        'height'              => 'decimal:2',
+        'depth'               => 'decimal:2',
     ];
+
+    // --------------------------------------------
+    // SLUG OPTIONS
+    // --------------------------------------------
 
     public function getSlugOptions(): SlugOptions
     {
         return SlugOptions::create()
-            ->generateSlugsFrom('name')
+            ->generateSlugsFrom(fn($product) => $product->getTranslation('name', app()->getLocale()))
             ->saveSlugsTo('slug')
             ->slugsShouldBeNoLongerThan(255);
     }
@@ -81,20 +89,36 @@ class Product extends Model implements HasMedia
         return 'slug';
     }
 
-    /**
-     * Register media collections for Spatie Media Library
-     */
+    // --------------------------------------------
+    // MEDIA LIBRARY
+    // --------------------------------------------
+
     public function registerMediaCollections(): void
     {
         $this
             ->addMediaCollection('images')
-            ->useFallbackUrl('/images/placeholder-product.jpg')
-            ->useFallbackPath(public_path('/images/placeholder-product.jpg'));
+            ->useDisk('public')
+            ->useFallbackUrl(asset('images/placeholder-product.jpg'))
+            ->useFallbackPath(public_path('images/placeholder-product.jpg'))
+            ->registerMediaConversions(function () {
+                $this->addMediaConversion('thumb')
+                    ->width(400)
+                    ->height(400)
+                    ->sharpen(10);
+
+                $this->addMediaConversion('medium')
+                    ->width(800)
+                    ->height(800);
+
+                $this->addMediaConversion('large')
+                    ->width(1200)
+                    ->height(1200);
+            });
     }
 
-    // ============================================
+    // --------------------------------------------
     // RELATIONSHIPS
-    // ============================================
+    // --------------------------------------------
 
     public function categories(): BelongsToMany
     {
@@ -133,23 +157,20 @@ class Product extends Model implements HasMedia
         return $this->hasMany(WishlistItem::class);
     }
 
-    // ============================================
-    // IMAGE HELPER METHODS
-    // ============================================
+    // --------------------------------------------
+    // IMAGE HELPERS
+    // --------------------------------------------
 
-    /**
-     * Get primary/first image URL
-     */
-    public function getPrimaryImageUrl(): ?string
+    public function getPrimaryImageUrl(): string
     {
-        $media = $this->getFirstMedia('images');
-
-        return $media ? $media->getUrl() : asset('/images/placeholder-product.jpg');
+        return $this->getFirstMediaUrl('images', 'large') ?: asset('images/placeholder-product.jpg');
     }
 
-    /**
-     * Get all product image URLs
-     */
+    public function getThumbnailUrl(): string
+    {
+        return $this->getFirstMediaUrl('images', 'thumb') ?: asset('images/placeholder-product.jpg');
+    }
+
     public function getAllImageUrls(): array
     {
         return $this->getMedia('images')
@@ -157,27 +178,14 @@ class Product extends Model implements HasMedia
             ->toArray();
     }
 
-    /**
-     * Get thumbnail URL (medium size)
-     */
-    public function getThumbnailUrl(string $conversion = 'thumb'): ?string
-    {
-        $media = $this->getFirstMedia('images');
-
-        return $media ? $media->getUrl($conversion) : asset('/images/placeholder-product.jpg');
-    }
-
-    /**
-     * Check if product has images
-     */
     public function hasImages(): bool
     {
         return $this->hasMedia('images');
     }
 
-    // ============================================
+    // --------------------------------------------
     // SCOPES
-    // ============================================
+    // --------------------------------------------
 
     public function scopeActive($query)
     {
@@ -191,59 +199,63 @@ class Product extends Model implements HasMedia
 
     public function scopeInStock($query)
     {
-        return $query->where('stock_quantity', '>', 0)
-            ->orWhere('stock_status', 'in_stock');
+        return $query->where(function ($q) {
+            $q->where('stock_quantity', '>', 0)
+                ->orWhere('stock_status', 'in_stock');
+        });
     }
 
-    // ============================================
-    // HELPER METHODS
-    // ============================================
+    public function scopeLowStock($query)
+    {
+        return $query->whereColumn('stock_quantity', '<=', 'low_stock_threshold');
+    }
 
-    /**
-     * Check if product is in stock
-     */
+    // --------------------------------------------
+    // LOGIC & HELPERS
+    // --------------------------------------------
+
     public function isInStock(): bool
     {
         return $this->stock_quantity > 0 || $this->stock_status === 'in_stock';
     }
 
-    /**
-     * Check if stock is low
-     */
     public function isLowStock(): bool
     {
-        if (!$this->low_stock_threshold) {
-            return false;
-        }
-
-        return $this->stock_quantity <= $this->low_stock_threshold;
+        return $this->low_stock_threshold
+            ? $this->stock_quantity <= $this->low_stock_threshold
+            : false;
     }
 
-    /**
-     * Get final price (considering discount)
-     */
+    public function hasDiscount(): bool
+    {
+        return $this->compare_at_price && $this->compare_at_price > $this->price;
+    }
+
     public function getFinalPrice(): float
     {
         return (float) $this->price;
     }
 
-    /**
-     * Get discount percentage
-     */
     public function getDiscountPercentage(): ?int
     {
-        if (!$this->compare_at_price || $this->compare_at_price <= $this->price) {
+        if (!$this->hasDiscount()) {
             return null;
         }
 
         return (int) round((($this->compare_at_price - $this->price) / $this->compare_at_price) * 100);
     }
 
-    /**
-     * Check if product has discount
-     */
-    public function hasDiscount(): bool
+    public function increaseStock(int $qty): void
     {
-        return $this->compare_at_price && $this->compare_at_price > $this->price;
+        $this->increment('stock_quantity', $qty);
+    }
+
+    public function decreaseStock(int $qty): void
+    {
+        if ($this->stock_quantity >= $qty) {
+            $this->decrement('stock_quantity', $qty);
+        } else {
+            $this->update(['stock_quantity' => 0]);
+        }
     }
 }

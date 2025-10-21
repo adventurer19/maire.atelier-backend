@@ -1,97 +1,107 @@
 <?php
-// app/Http/Controllers/Api/ProductController.php
 
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ApiResponse;
 use App\Http\Resources\ProductResource;
-use App\Repositories\ProductRepository;
-use Illuminate\Http\Request;
+use App\Models\Product;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
-    public function __construct(
-        private ProductRepository $productRepository
-    ) {}
+    use ApiResponse;
 
     /**
      * GET /api/products
-     * Lista na vsi4ki produkti s paginacija
+     * List all active products with optional category filter and pagination.
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->input('per_page', 12);
+        $perPage = (int) $request->input('per_page', 12);
         $categoryId = $request->input('category_id');
 
-        $products = $categoryId
-            ? $this->productRepository->filterByCategory($categoryId, $perPage)
-            : $this->productRepository->getActivePaginated($perPage);
+        $query = Product::query()
+            ->with(['categories', 'variants.attributeOptions', 'media'])
+            ->where('is_active', true)
+            ->orderByDesc('created_at');
 
-        return response()->json([
-            'data' => ProductResource::collection($products),
-            'meta' => [
-                'current_page' => $products->currentPage(),
-                'last_page' => $products->lastPage(),
-                'per_page' => $products->perPage(),
-                'total' => $products->total(),
-            ],
-        ]);
+        if ($categoryId) {
+            $query->whereHas('categories', fn($q) => $q->where('categories.id', $categoryId));
+        }
+
+        $products = $query->paginate($perPage);
+
+        return $this->paginated($products, ProductResource::collection($products));
     }
 
     /**
      * GET /api/products/featured
-     * Featured products
+     * Retrieve featured products (non-paginated).
      */
     public function featured(Request $request): JsonResponse
     {
-        $limit = $request->input('limit', 8);
-        $products = $this->productRepository->getFeatured($limit);
+        $limit = (int) $request->input('limit', 8);
 
-        return response()->json([
-            'data' => ProductResource::collection($products),
-        ]);
+        $products = Product::query()
+            ->with(['categories', 'media'])
+            ->where('is_active', true)
+            ->where('is_featured', true)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+
+        return $this->ok(ProductResource::collection($products));
     }
 
     /**
      * GET /api/products/{slug}
-     * Edinen produkt po slug
+     * Retrieve a single product by slug.
      */
     public function show(string $slug): JsonResponse
     {
-        $product = $this->productRepository->findBySlug($slug);
+        $product = Product::query()
+            ->with(['categories', 'variants.attributeOptions', 'media', 'reviews'])
+            ->where('slug', $slug)
+            ->where('is_active', true)
+            ->first();
 
-        return response()->json([
-            'data' => new ProductResource($product),
-        ]);
+        if (! $product) {
+            return $this->error('NOT_FOUND', __('common.not_found'), [], 404);
+        }
+
+        return $this->ok(new ProductResource($product));
     }
 
     /**
      * GET /api/search?q=dress
-     * Tursene na produkti
+     * Search products by keyword with pagination.
      */
     public function search(Request $request): JsonResponse
     {
-        $query = $request->input('q');
-        $perPage = $request->input('per_page', 12);
+        $queryString = trim($request->input('q', ''));
+        $perPage = (int) $request->input('per_page', 12);
 
-        if (!$query) {
-            return response()->json([
-                'message' => 'Search query is required',
-                'data' => [],
-            ], 400);
+        if ($queryString === '') {
+            return $this->error('VALIDATION_ERROR', __('validation.failed'), [
+                'q' => ['Search query is required.'],
+            ], 422);
         }
 
-        $products = $this->productRepository->search($query, $perPage);
+        $products = Product::query()
+            ->with(['categories', 'media'])
+            ->where('is_active', true)
+            ->where(function ($q) use ($queryString) {
+                $q->where('name->bg', 'LIKE', "%{$queryString}%")
+                    ->orWhere('name->en', 'LIKE', "%{$queryString}%")
+                    ->orWhere('description->bg', 'LIKE', "%{$queryString}%")
+                    ->orWhere('description->en', 'LIKE', "%{$queryString}%")
+                    ->orWhere('sku', 'LIKE', "%{$queryString}%");
+            })
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
 
-        return response()->json([
-            'data' => ProductResource::collection($products),
-            'meta' => [
-                'query' => $query,
-                'current_page' => $products->currentPage(),
-                'last_page' => $products->lastPage(),
-                'total' => $products->total(),
-            ],
-        ]);
+        return $this->paginated($products, ProductResource::collection($products));
     }
 }

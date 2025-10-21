@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,14 +16,20 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->api(append: [
+        // ✅ Web middleware group
+        $middleware->web(append: [
             SetLocale::class,
+            SecurityHeaders::class,
         ]);
+
+        // ✅ API middleware group
         $middleware->api(prepend: [
             SubstituteBindings::class,
+            SecurityHeaders::class, // HTTP Shield headers
+            ThrottleRequests::class . ':60,1', // rate limiting
         ]);
     })
-
     ->withExceptions(function (Exceptions $exceptions): void {
         //
-    })->create();
+    })
+    ->create();

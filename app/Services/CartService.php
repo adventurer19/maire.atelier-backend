@@ -23,6 +23,7 @@ class CartService
 
         // For guests, use session ID
         $sessionId = session()->getId();
+
         if (!$sessionId) {
             session()->start();
             $sessionId = session()->getId();
@@ -46,8 +47,7 @@ class CartService
             $query->where('session_id', $identifier['session_id']);
         }
 
-        return $query->with(['product.media', 'variant'])
-            ->get();
+        return $query->with(['product', 'variant'])->get();
     }
 
     /**
@@ -64,8 +64,8 @@ class CartService
             'items' => $items,
             'subtotal' => $subtotal,
             'total_items' => $totalItems,
-            'shipping' => 0, // TODO: Calculate shipping
-            'tax' => 0, // TODO: Calculate tax
+            'shipping' => 0, // TODO: implement later
+            'tax' => 0,      // TODO: implement later
             'total' => $subtotal,
         ];
     }
@@ -73,28 +73,16 @@ class CartService
     /**
      * Add item to cart
      */
-    public function addItem(
-        int $productId,
-        int $quantity = 1,
-        ?int $variantId = null
-    ): CartItem {
-        // Validate product exists
+    public function addItem(int $productId, int $quantity = 1, ?int $variantId = null): CartItem
+    {
         $product = Product::findOrFail($productId);
+        $variant = $variantId ? ProductVariant::where('product_id', $productId)->findOrFail($variantId) : null;
 
-        // Validate variant if provided
-        if ($variantId) {
-            $variant = ProductVariant::where('product_id', $productId)
-                ->findOrFail($variantId);
+        // Determine stock source
+        $stock = $variant?->stock_quantity ?? $product->stock_quantity;
 
-            // Check stock
-            if ($variant->stock < $quantity) {
-                throw new \Exception('Insufficient stock for this variant');
-            }
-        } else {
-            // Check product stock
-            if ($product->stock < $quantity) {
-                throw new \Exception('Insufficient stock');
-            }
+        if ($stock < $quantity) {
+            throw new \Exception('Insufficient stock available.');
         }
 
         $identifier = $this->getCartIdentifier();
@@ -109,20 +97,16 @@ class CartService
             ->first();
 
         if ($existingItem) {
-            // Update quantity
             $newQuantity = $existingItem->quantity + $quantity;
 
-            // Check stock again
-            $stock = $variantId ? $variant->stock : $product->stock;
             if ($newQuantity > $stock) {
-                throw new \Exception('Cannot add more items. Insufficient stock.');
+                throw new \Exception('Cannot add more items. Stock limit reached.');
             }
 
             $existingItem->update(['quantity' => $newQuantity]);
             return $existingItem->fresh();
         }
 
-        // Create new cart item
         return CartItem::create([
             'user_id' => $identifier['user_id'],
             'session_id' => $identifier['session_id'],
@@ -144,18 +128,19 @@ class CartService
             ->when($identifier['session_id'], fn($q) => $q->where('session_id', $identifier['session_id']))
             ->firstOrFail();
 
-        // Check stock
-        $stock = $item->variant?->stock ?? $item->product->stock;
+        $stock = $item->variant?->stock_quantity ?? $item->product->stock_quantity;
+
         if ($quantity > $stock) {
-            throw new \Exception('Insufficient stock');
+            throw new \Exception('Insufficient stock available.');
         }
 
         if ($quantity <= 0) {
             $item->delete();
-            throw new \Exception('Item removed from cart');
+            throw new \Exception('Item removed from cart.');
         }
 
         $item->update(['quantity' => $quantity]);
+
         return $item->fresh();
     }
 
@@ -166,12 +151,10 @@ class CartService
     {
         $identifier = $this->getCartIdentifier();
 
-        $deleted = CartItem::where('id', $cartItemId)
-            ->when($identifier['user_id'], fn($q) => $q->where('user_id', $identifier['user_id']))
-            ->when($identifier['session_id'], fn($q) => $q->where('session_id', $identifier['session_id']))
-            ->delete();
-
-        return $deleted > 0;
+        return CartItem::where('id', $cartItemId)
+                ->when($identifier['user_id'], fn($q) => $q->where('user_id', $identifier['user_id']))
+                ->when($identifier['session_id'], fn($q) => $q->where('session_id', $identifier['session_id']))
+                ->delete() > 0;
     }
 
     /**
@@ -196,7 +179,6 @@ class CartService
             $guestItems = CartItem::where('session_id', $guestSessionId)->get();
 
             foreach ($guestItems as $guestItem) {
-                // Check if user already has this item
                 $userItem = CartItem::where([
                     'user_id' => $userId,
                     'product_id' => $guestItem->product_id,
@@ -204,17 +186,12 @@ class CartService
                 ])->first();
 
                 if ($userItem) {
-                    // Merge quantities
-                    $newQuantity = $userItem->quantity + $guestItem->quantity;
-                    $stock = $guestItem->variant?->stock ?? $guestItem->product->stock;
+                    $stock = $guestItem->variant?->stock_quantity ?? $guestItem->product->stock_quantity;
+                    $newQuantity = min($userItem->quantity + $guestItem->quantity, $stock);
 
-                    $userItem->update([
-                        'quantity' => min($newQuantity, $stock)
-                    ]);
-
+                    $userItem->update(['quantity' => $newQuantity]);
                     $guestItem->delete();
                 } else {
-                    // Move guest item to user
                     $guestItem->update([
                         'user_id' => $userId,
                         'session_id' => null,
@@ -241,15 +218,13 @@ class CartService
         $errors = [];
 
         foreach ($items as $item) {
-            // Check if product still exists and is active
             if (!$item->product->is_active) {
-                $errors[] = "Product '{$item->product->name}' is no longer available";
+                $errors[] = "Product '{$item->product->name}' is no longer available.";
             }
 
-            // Check stock
             if (!$item->hasEnoughStock()) {
-                $stock = $item->variant?->stock ?? $item->product->stock;
-                $errors[] = "Only {$stock} items available for '{$item->product->name}'";
+                $stock = $item->variant?->stock_quantity ?? $item->product->stock_quantity;
+                $errors[] = "Only {$stock} items left for '{$item->product->name}'.";
             }
         }
 

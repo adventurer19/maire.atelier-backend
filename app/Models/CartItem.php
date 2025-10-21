@@ -10,22 +10,37 @@ class CartItem extends Model
 {
     use HasFactory;
 
+    /**
+     * Mass assignable attributes.
+     */
     protected $fillable = [
-        'session_id',
         'user_id',
         'product_id',
         'variant_id',
         'quantity',
+        'price',
+        'token', // guest cart token (for anonymous carts)
     ];
-
-    protected $casts = [
-        'quantity' => 'integer',
-    ];
-
-    protected $with = ['product', 'variant'];
 
     /**
-     * Get the user that owns the cart item
+     * Attribute casting.
+     */
+    protected $casts = [
+        'quantity' => 'integer',
+        'price' => 'float',
+    ];
+
+    /**
+     * Eager-loaded relations.
+     */
+    protected $with = ['product', 'variant'];
+
+    // -------------------------------------------------------------------------
+    // 🧩 RELATIONS
+    // -------------------------------------------------------------------------
+
+    /**
+     * The user who owns this cart item (nullable for guests).
      */
     public function user(): BelongsTo
     {
@@ -33,7 +48,7 @@ class CartItem extends Model
     }
 
     /**
-     * Get the product for this cart item
+     * The product for this cart item.
      */
     public function product(): BelongsTo
     {
@@ -41,32 +56,36 @@ class CartItem extends Model
     }
 
     /**
-     * Get the variant for this cart item (if any)
+     * The product variant (if any).
      */
     public function variant(): BelongsTo
     {
         return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
 
-    /**
-     * Calculate the subtotal for this cart item
-     */
-    public function getSubtotalAttribute(): float
-    {
-        $price = $this->variant?->price ?? $this->product->price;
-        return $price * $this->quantity;
-    }
+    // -------------------------------------------------------------------------
+    // 🧮 COMPUTED ATTRIBUTES
+    // -------------------------------------------------------------------------
 
     /**
-     * Get the item price (variant or product)
+     * Get the effective price (variant or base product).
      */
     public function getPriceAttribute(): float
     {
-        return $this->variant?->price ?? $this->product->price;
+        // if price is already stored, prefer it
+        return $this->attributes['price'] ?? ($this->variant?->price ?? $this->product->price);
     }
 
     /**
-     * Check if product has enough stock
+     * Calculate the subtotal for this cart item.
+     */
+    public function getSubtotalAttribute(): float
+    {
+        return $this->price * $this->quantity;
+    }
+
+    /**
+     * Check if the product/variant has enough stock.
      */
     public function hasEnoughStock(): bool
     {
@@ -74,19 +93,34 @@ class CartItem extends Model
         return $stock >= $this->quantity;
     }
 
-    /**
-     * Scope to filter by session ID
-     */
-    public function scopeForSession($query, string $sessionId)
-    {
-        return $query->where('session_id', $sessionId);
-    }
+    // -------------------------------------------------------------------------
+    // 🔍 SCOPES
+    // -------------------------------------------------------------------------
 
     /**
-     * Scope to filter by user ID
+     * Scope for a specific authenticated user.
      */
     public function scopeForUser($query, ?int $userId)
     {
         return $query->where('user_id', $userId);
+    }
+
+    /**
+     * Scope for a specific guest token.
+     */
+    public function scopeForToken($query, ?string $token)
+    {
+        return $query->where('token', $token);
+    }
+
+    /**
+     * Scope to get items for either user or guest.
+     * (Unified entry point for cart retrieval)
+     */
+    public function scopeForOwner($query, ?int $userId, ?string $token)
+    {
+        return $query
+            ->when($userId, fn($q) => $q->where('user_id', $userId))
+            ->when(!$userId && $token, fn($q) => $q->where('token', $token));
     }
 }

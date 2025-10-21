@@ -4,15 +4,20 @@ namespace App\Enums;
 
 enum UserRole: string
 {
-    case CUSTOMER = 'customer';
-    case ADMIN = 'admin';
+    case Admin = 'admin';
+    case Customer = 'customer';
+    case Editor = 'editor';
 
     /**
      * Get translated label
      */
     public function label(): string
     {
-        return __('enums.user_role.' . $this->value);
+        return match($this) {
+            self::Admin    => __('Admin'),
+            self::Customer => __('Customer'),
+            self::Editor   => __('Editor'),
+        };
     }
 
     /**
@@ -21,8 +26,9 @@ enum UserRole: string
     public function color(): string
     {
         return match($this) {
-            self::CUSTOMER => 'gray',
-            self::ADMIN => 'success',
+            self::Admin    => 'success',
+            self::Editor   => 'warning',
+            self::Customer => 'gray',
         };
     }
 
@@ -32,52 +38,47 @@ enum UserRole: string
     public function icon(): string
     {
         return match($this) {
-            self::CUSTOMER => 'heroicon-o-user',
-            self::ADMIN => 'heroicon-o-shield-check',
+            self::Admin    => 'heroicon-o-shield-check',
+            self::Editor   => 'heroicon-o-pencil-square',
+            self::Customer => 'heroicon-o-user',
         };
     }
 
     /**
-     * Check if user can access admin panel
+     * Permission helpers
      */
     public function canAccessAdmin(): bool
     {
-        return $this === self::ADMIN;
+        return in_array($this, [self::Admin, self::Editor]);
     }
 
-    /**
-     * Check if user is admin
-     */
     public function isAdmin(): bool
     {
-        return $this === self::ADMIN;
+        return $this === self::Admin;
     }
 
-    /**
-     * Check if user is customer
-     */
     public function isCustomer(): bool
     {
-        return $this === self::CUSTOMER;
+        return $this === self::Customer;
+    }
+
+    public function isEditor(): bool
+    {
+        return $this === self::Editor;
     }
 
     /**
-     * Get all values as array
+     * Utility methods
      */
     public static function toArray(): array
     {
         return array_column(self::cases(), 'value');
     }
 
-    /**
-     * Get options for select fields (value => label)
-     */
     public static function options(): array
     {
-        $options = [];
-        foreach (self::cases() as $case) {
-            $options[$case->value] = $case->label();
-        }
-        return $options;
+        return collect(self::cases())
+            ->mapWithKeys(fn($case) => [$case->value => $case->label()])
+            ->toArray();
     }
 }

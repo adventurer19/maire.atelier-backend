@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ApiResponse;
 use App\Http\Resources\CartItemResource;
 use App\Services\CartService;
 use Illuminate\Http\Request;
@@ -10,51 +11,47 @@ use Illuminate\Http\JsonResponse;
 
 class CartController extends Controller
 {
+    use ApiResponse;
+
     public function __construct(
         protected CartService $cartService
     ) {}
 
     /**
-     * Get cart items and summary
-     *
      * GET /api/cart
+     * Retrieve the current cart with items and summary.
      */
     public function index(): JsonResponse
     {
         try {
             $summary = $this->cartService->getCartSummary();
 
-            return response()->json([
-                'data' => [
-                    'items' => CartItemResource::collection($summary['items']),
-                    'summary' => [
-                        'subtotal' => $summary['subtotal'],
-                        'shipping' => $summary['shipping'],
-                        'tax' => $summary['tax'],
-                        'total' => $summary['total'],
-                        'total_items' => $summary['total_items'],
-                    ],
+            return $this->ok([
+                'items' => CartItemResource::collection($summary['items']),
+                'summary' => [
+                    'subtotal'    => $summary['subtotal'],
+                    'shipping'    => $summary['shipping'],
+                    'tax'         => $summary['tax'],
+                    'total'       => $summary['total'],
+                    'total_items' => $summary['total_items'],
                 ],
             ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to fetch cart',
-                'error' => $e->getMessage(),
+        } catch (\Throwable $e) {
+            return $this->error('CART_FETCH_FAILED', __('common.something_went_wrong'), [
+                'exception' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Add item to cart
-     *
      * POST /api/cart/items
-     * Body: { product_id, quantity, variant_id? }
+     * Add an item to the cart.
      */
     public function addItem(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1|max:100',
+            'quantity'   => 'required|integer|min:1|max:100',
             'variant_id' => 'nullable|exists:product_variants,id',
         ]);
 
@@ -67,27 +64,20 @@ class CartController extends Controller
 
             $summary = $this->cartService->getCartSummary();
 
-            return response()->json([
-                'message' => 'Item added to cart successfully',
-                'data' => [
-                    'item' => new CartItemResource($item),
-                    'cart_count' => $summary['total_items'],
-                ],
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-                'error' => 'CART_ADD_FAILED',
+            return $this->created([
+                'item'       => new CartItemResource($item),
+                'cart_count' => $summary['total_items'],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->error('CART_ADD_FAILED', __('common.something_went_wrong'), [
+                'exception' => $e->getMessage(),
             ], 422);
         }
     }
 
     /**
-     * Update cart item quantity
-     *
-     * PUT /api/cart/items/{item}
-     * Body: { quantity }
+     * PUT /api/cart/items/{itemId}
+     * Update the quantity of a cart item.
      */
     public function updateItem(Request $request, int $itemId): JsonResponse
     {
@@ -103,122 +93,99 @@ class CartController extends Controller
 
             $summary = $this->cartService->getCartSummary();
 
-            return response()->json([
-                'message' => 'Cart item updated successfully',
-                'data' => [
-                    'item' => new CartItemResource($item),
-                    'cart_count' => $summary['total_items'],
-                ],
+            return $this->ok([
+                'item'       => new CartItemResource($item),
+                'cart_count' => $summary['total_items'],
             ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-                'error' => 'CART_UPDATE_FAILED',
+        } catch (\Throwable $e) {
+            return $this->error('CART_UPDATE_FAILED', __('common.something_went_wrong'), [
+                'exception' => $e->getMessage(),
             ], 422);
         }
     }
 
     /**
-     * Remove item from cart
-     *
-     * DELETE /api/cart/items/{item}
+     * DELETE /api/cart/items/{itemId}
+     * Remove a specific item from the cart.
      */
     public function removeItem(int $itemId): JsonResponse
     {
         try {
             $removed = $this->cartService->removeItem($itemId);
 
-            if (!$removed) {
-                return response()->json([
-                    'message' => 'Cart item not found',
-                    'error' => 'CART_ITEM_NOT_FOUND',
+            if (! $removed) {
+                return $this->error('CART_ITEM_NOT_FOUND', __('common.not_found'), [
+                    'item_id' => $itemId,
                 ], 404);
             }
 
             $summary = $this->cartService->getCartSummary();
 
-            return response()->json([
-                'message' => 'Item removed from cart successfully',
-                'data' => [
-                    'cart_count' => $summary['total_items'],
-                ],
+            return $this->ok([
+                'cart_count' => $summary['total_items'],
             ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-                'error' => 'CART_REMOVE_FAILED',
+        } catch (\Throwable $e) {
+            return $this->error('CART_REMOVE_FAILED', __('common.something_went_wrong'), [
+                'exception' => $e->getMessage(),
             ], 422);
         }
     }
 
     /**
-     * Clear entire cart
-     *
      * DELETE /api/cart
+     * Clear all items from the cart.
      */
     public function clear(): JsonResponse
     {
         try {
             $this->cartService->clearCart();
 
-            return response()->json([
-                'message' => 'Cart cleared successfully',
-                'data' => [
-                    'cart_count' => 0,
-                ],
+            return $this->ok([
+                'cart_count' => 0,
             ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to clear cart',
-                'error' => $e->getMessage(),
+        } catch (\Throwable $e) {
+            return $this->error('CART_CLEAR_FAILED', __('common.something_went_wrong'), [
+                'exception' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Get cart item count only (lightweight endpoint)
-     *
      * GET /api/cart/count
+     * Retrieve only the number of items in the cart.
      */
     public function count(): JsonResponse
     {
         try {
             $count = $this->cartService->getItemCount();
 
-            return response()->json([
-                'data' => [
-                    'count' => $count,
-                ],
+            return $this->ok([
+                'count' => $count,
             ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to fetch cart count',
-                'error' => $e->getMessage(),
+        } catch (\Throwable $e) {
+            return $this->error('CART_COUNT_FAILED', __('common.something_went_wrong'), [
+                'exception' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Validate cart before checkout
-     *
-     * POST /api/cart/validate
+     * POST /api/cart/checkout/validate
+     * Validate the cart before checkout.
      */
-    public function validate(): JsonResponse
+    public function validateCart(): JsonResponse
     {
         try {
             $validation = $this->cartService->validateCart();
 
-            return response()->json([
-                'data' => $validation,
-            ], $validation['valid'] ? 200 : 422);
+            if (! $validation['valid']) {
+                return $this->error('CART_VALIDATION_FAILED', __('validation.failed'), $validation, 422);
+            }
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to validate cart',
-                'error' => $e->getMessage(),
+            return $this->ok($validation);
+        } catch (\Throwable $e) {
+            return $this->error('CART_VALIDATION_ERROR', __('common.something_went_wrong'), [
+                'exception' => $e->getMessage(),
             ], 500);
         }
     }

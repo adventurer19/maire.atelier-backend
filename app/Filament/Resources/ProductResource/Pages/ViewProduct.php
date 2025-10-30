@@ -24,6 +24,20 @@ class ViewProduct extends ViewRecord
     {
         return $infolist
             ->schema([
+                // 🖼️ IMAGE SECTION (ново)
+                Infolists\Components\Section::make('Images')
+                    ->schema([
+                        Infolists\Components\SpatieMediaLibraryImageEntry::make('images')
+                            ->collection('images')
+                            ->label('Product Images')
+                            ->conversion('medium')
+                            ->limit(5)
+                            ->defaultImageUrl(asset('images/placeholder-product.jpg'))
+                            ->columns(5),
+                    ])
+                    ->collapsible()
+                    ->collapsed(false),
+
                 Infolists\Components\Section::make('Product Details')
                     ->schema([
                         Infolists\Components\Grid::make(2)
@@ -119,11 +133,8 @@ class ViewProduct extends ViewRecord
                 Infolists\Components\Section::make('Timestamps')
                     ->columns(2)
                     ->schema([
-                        Infolists\Components\TextEntry::make('created_at')
-                            ->dateTime(),
-
-                        Infolists\Components\TextEntry::make('updated_at')
-                            ->dateTime(),
+                        Infolists\Components\TextEntry::make('created_at')->dateTime(),
+                        Infolists\Components\TextEntry::make('updated_at')->dateTime(),
                     ]),
             ]);
     }

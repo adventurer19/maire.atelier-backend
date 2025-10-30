@@ -30,26 +30,32 @@ class CollectionResource extends Resource
                     ->schema([
                         Forms\Components\Grid::make(2)
                             ->schema([
+                                // NAME (EN)
                                 Forms\Components\TextInput::make('name.en')
                                     ->label('Name (EN)')
                                     ->required()
                                     ->maxLength(255)
                                     ->live(onBlur: true)
-                                    ->afterStateUpdated(fn ($state, callable $set) =>
-                                    $set('slug', Str::slug($state))
-                                    ),
+                                    ->afterStateUpdated(function ($state, callable $set, $get) {
+                                        if (empty($get('slug'))) {
+                                            $set('slug', Str::slug($state));
+                                        }
+                                    }),
 
+                                // NAME (BG)
                                 Forms\Components\TextInput::make('name.bg')
                                     ->label('Name (BG)')
                                     ->required()
                                     ->maxLength(255),
 
+                                // SLUG
                                 Forms\Components\TextInput::make('slug')
                                     ->required()
                                     ->unique(ignoreRecord: true)
                                     ->maxLength(255)
-                                    ->helperText('URL-friendly version of the name'),
+                                    ->helperText('URL-friendly version'),
 
+                                // TYPE
                                 Forms\Components\Select::make('type')
                                     ->options([
                                         'manual' => 'Manual',
@@ -57,82 +63,86 @@ class CollectionResource extends Resource
                                     ])
                                     ->required()
                                     ->default('manual')
+                                    ->native(false)
                                     ->helperText('Manual: Select products manually. Auto: Products added automatically based on rules.'),
                             ]),
 
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\Textarea::make('description.en')
-                                    ->label('Description (EN)')
-                                    ->rows(3)
-                                    ->maxLength(500),
+                        // DESCRIPTION
+                        Forms\Components\Textarea::make('description.en')
+                            ->label('Description (EN)')
+                            ->rows(3)
+                            ->maxLength(1000)
+                            ->columnSpanFull(),
 
-                                Forms\Components\Textarea::make('description.bg')
-                                    ->label('Description (BG)')
-                                    ->rows(3)
-                                    ->maxLength(500),
-                            ]),
-                    ]),
+                        Forms\Components\Textarea::make('description.bg')
+                            ->label('Description (BG)')
+                            ->rows(3)
+                            ->maxLength(1000)
+                            ->columnSpanFull(),
 
-                Forms\Components\Section::make('Products')
+                        // IMAGE URL
+                        Forms\Components\TextInput::make('image')
+                            ->label('Image URL')
+                            ->url()
+                            ->maxLength(500)
+                            ->columnSpanFull()
+                            ->helperText('Enter image URL'),
+
+                        // POSITION
+                        Forms\Components\TextInput::make('position')
+                            ->label('Display Order')
+                            ->numeric()
+                            ->default(0)
+                            ->minValue(0)
+                            ->helperText('Lower numbers appear first'),
+                    ])->columns(2),
+
+                // AUTO COLLECTION RULES
+                Forms\Components\Section::make('Automatic Collection Rules')
                     ->schema([
-                        Forms\Components\Select::make('products')
-                            ->relationship('products', 'name')
-                            ->multiple()
-                            ->searchable()
-                            ->preload()
-                            ->helperText('Select products to add to this collection')
-                            ->visible(fn ($get) => $get('type') === 'manual'),
+                        Forms\Components\KeyValue::make('conditions')
+                            ->label('Conditions (JSON)')
+                            ->helperText('Define rules for automatic product inclusion (e.g., category_id, is_featured, price_range)')
+                            ->columnSpanFull(),
                     ])
-                    ->description('Manually select products for this collection'),
+                    ->visible(fn ($get) => $get('type') === 'auto')
+                    ->collapsible(),
 
-                Forms\Components\Section::make('SEO Settings')
-                    ->collapsible()
-                    ->collapsed()
+                // SEO
+                Forms\Components\Section::make('SEO')
                     ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('meta_title.en')
-                                    ->label('Meta Title (EN)')
-                                    ->maxLength(60)
-                                    ->helperText('Max 60 characters for SEO'),
+                        Forms\Components\TextInput::make('meta_title.en')
+                            ->label('Meta Title (EN)')
+                            ->maxLength(255),
 
-                                Forms\Components\TextInput::make('meta_title.bg')
-                                    ->label('Meta Title (BG)')
-                                    ->maxLength(60),
-                            ]),
+                        Forms\Components\TextInput::make('meta_title.bg')
+                            ->label('Meta Title (BG)')
+                            ->maxLength(255),
 
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\Textarea::make('meta_description.en')
-                                    ->label('Meta Description (EN)')
-                                    ->maxLength(160)
-                                    ->rows(3)
-                                    ->helperText('Max 160 characters for SEO'),
+                        Forms\Components\Textarea::make('meta_description.en')
+                            ->label('Meta Description (EN)')
+                            ->rows(2)
+                            ->maxLength(500),
 
-                                Forms\Components\Textarea::make('meta_description.bg')
-                                    ->label('Meta Description (BG)')
-                                    ->maxLength(160)
-                                    ->rows(3),
-                            ]),
-                    ]),
+                        Forms\Components\Textarea::make('meta_description.bg')
+                            ->label('Meta Description (BG)')
+                            ->rows(2)
+                            ->maxLength(500),
+                    ])->columns(2)->collapsible()->collapsed(),
 
-                Forms\Components\Section::make('Settings')
+                // STATUS
+                Forms\Components\Section::make('Visibility')
                     ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('position')
-                                    ->numeric()
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->helperText('Order in which collections are displayed'),
+                        Forms\Components\Toggle::make('is_active')
+                            ->label('Active')
+                            ->default(true)
+                            ->helperText('Collection is visible on storefront'),
 
-                                Forms\Components\Toggle::make('is_active')
-                                    ->label('Active')
-                                    ->default(true)
-                                    ->helperText('Show collection on storefront'),
-                            ]),
-                    ]),
+                        Forms\Components\Toggle::make('is_featured')
+                            ->label('Featured')
+                            ->default(false)
+                            ->helperText('Show in featured sections'),
+                    ])->columns(2),
             ]);
     }
 
@@ -141,6 +151,7 @@ class CollectionResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
+                    ->label('Collection Name')
                     ->searchable()
                     ->sortable()
                     ->wrap()
@@ -206,24 +217,8 @@ class CollectionResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
-
-                    Tables\Actions\BulkAction::make('activate')
-                        ->label('Activate')
-                        ->icon('heroicon-o-check-circle')
-                        ->action(fn ($records) => $records->each->update(['is_active' => true]))
-                        ->deselectRecordsAfterCompletion()
-                        ->color('success'),
-
-                    Tables\Actions\BulkAction::make('deactivate')
-                        ->label('Deactivate')
-                        ->icon('heroicon-o-x-circle')
-                        ->action(fn ($records) => $records->each->update(['is_active' => false]))
-                        ->deselectRecordsAfterCompletion()
-                        ->color('danger'),
                 ]),
-            ])
-            ->defaultSort('position', 'asc')
-            ->reorderable('position');
+            ]);
     }
 
     public static function getRelations(): array
@@ -239,12 +234,6 @@ class CollectionResource extends Resource
             'index' => Pages\ListCollections::route('/'),
             'create' => Pages\CreateCollection::route('/create'),
             'edit' => Pages\EditCollection::route('/{record}/edit'),
-            'view' => Pages\ViewCollection::route('/{record}'),
         ];
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return static::getModel()::count();
     }
 }

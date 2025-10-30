@@ -148,15 +148,10 @@ class ItemsRelationManager extends RelationManager
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('subtotal')
+                    ->label('Subtotal')
                     ->money('EUR')
-                    ->sortable()
-                    ->weight('bold')
-                    ->summarize([
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->money('EUR')
-                            ->label('Total'),
-                    ]),
-            ])
+                    ->getStateUsing(fn ($record) => $record->price * $record->quantity),
+        ])
             ->filters([
                 //
             ])

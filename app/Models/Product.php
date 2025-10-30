@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Translatable\HasTranslations;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
@@ -19,7 +20,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Product extends Model implements HasMedia
 {
-    use HasFactory, HasTranslations, HasSlug, InteractsWithMedia;
+    use HasFactory, HasTranslations, HasSlug, InteractsWithMedia, SoftDeletes;
 
     protected $fillable = [
         'sku',

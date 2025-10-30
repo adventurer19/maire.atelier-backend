@@ -58,79 +58,55 @@ class CouponResource extends Resource
                                     ->numeric()
                                     ->minValue(0)
                                     ->step(0.01)
-                                    ->suffix(fn ($get) => $get('type') === 'percentage' ? '%' : '€')
-                                    ->live()
-                                    ->rules([
-                                        fn ($get) => function ($attribute, $value, $fail) use ($get) {
-                                            if ($get('type') === 'percentage' && $value > 100) {
-                                                $fail('Percentage cannot exceed 100%');
-                                            }
-                                        },
-                                    ]),
+                                    ->suffix(fn ($get) => $get('type') === 'percentage' ? '%' : 'BGN')
+                                    ->helperText(fn ($get) => $get('type') === 'percentage'
+                                        ? 'Enter percentage (e.g., 20 for 20% off)'
+                                        : 'Enter fixed amount in BGN'),
 
-                                Forms\Components\Toggle::make('is_active')
-                                    ->label('Active')
-                                    ->default(true)
-                                    ->helperText('Enable or disable this coupon'),
-                            ]),
-                    ]),
-
-                Forms\Components\Section::make('Conditions & Limits')
-                    ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('min_purchase_amount')
+                                Forms\Components\TextInput::make('min_purchase')
                                     ->label('Minimum Purchase Amount')
                                     ->numeric()
                                     ->minValue(0)
                                     ->step(0.01)
-                                    ->prefix('€')
-                                    ->helperText('Minimum order amount required (optional)'),
+                                    ->prefix('BGN')
+                                    ->helperText('Leave empty for no minimum'),
 
-                                Forms\Components\TextInput::make('max_discount_amount')
+                                Forms\Components\TextInput::make('max_discount')
                                     ->label('Maximum Discount Amount')
                                     ->numeric()
                                     ->minValue(0)
                                     ->step(0.01)
-                                    ->prefix('€')
-                                    ->helperText('Cap the maximum discount (optional)')
-                                    ->visible(fn ($get) => $get('type') === 'percentage'),
-                            ]),
+                                    ->prefix('BGN')
+                                    ->visible(fn ($get) => $get('type') === 'percentage')
+                                    ->helperText('Maximum discount cap for percentage coupons'),
 
-                        Forms\Components\Grid::make(2)
-                            ->schema([
                                 Forms\Components\TextInput::make('usage_limit')
                                     ->label('Usage Limit')
                                     ->numeric()
-                                    ->minValue(1)
-                                    ->helperText('Maximum number of times this coupon can be used (leave empty for unlimited)'),
-
-                                Forms\Components\TextInput::make('usage_count')
-                                    ->label('Times Used')
-                                    ->numeric()
+                                    ->minValue(0)
                                     ->default(0)
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->helperText('Current usage count'),
+                                    ->helperText('0 = unlimited uses'),
                             ]),
-                    ]),
 
-                Forms\Components\Section::make('Validity Period')
-                    ->schema([
                         Forms\Components\Grid::make(2)
                             ->schema([
-                                Forms\Components\DateTimePicker::make('starts_at')
+                                Forms\Components\DateTimePicker::make('valid_from')
                                     ->label('Valid From')
-                                    ->native(false)
-                                    ->helperText('When this coupon becomes active (optional)'),
+                                    ->displayFormat('d/m/Y H:i')
+                                    ->helperText('Leave empty to activate immediately'),
 
-                                Forms\Components\DateTimePicker::make('expires_at')
+                                Forms\Components\DateTimePicker::make('valid_until')
                                     ->label('Valid Until')
-                                    ->native(false)
-                                    ->helperText('When this coupon expires (optional)')
-                                    ->after('starts_at'),
+                                    ->displayFormat('d/m/Y H:i')
+                                    ->after('valid_from')
+                                    ->helperText('Leave empty for no expiration'),
                             ]),
-                    ]),
+
+                        Forms\Components\Toggle::make('is_active')
+                            ->label('Active')
+                            ->default(true)
+                            ->helperText('Deactivate to temporarily disable the coupon'),
+                    ])->columns(1),
             ]);
     }
 
@@ -139,68 +115,71 @@ class CouponResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('code')
+                    ->label('Code')
                     ->searchable()
                     ->sortable()
-                    ->weight('bold')
                     ->copyable()
-                    ->tooltip('Click to copy'),
+                    ->weight('bold')
+                    ->color('primary'),
 
                 Tables\Columns\TextColumn::make('type')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'percentage' => 'success',
                         'fixed' => 'info',
+                        default => 'gray',
                     })
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'percentage' => 'Percentage',
-                        'fixed' => 'Fixed Amount',
-                    }),
+                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
 
                 Tables\Columns\TextColumn::make('value')
                     ->label('Discount')
-                    ->sortable()
-                    ->formatStateUsing(fn ($state, $record) =>
+                    ->formatStateUsing(fn ($record): string =>
                     $record->type === 'percentage'
-                        ? $state . '%'
-                        : '€' . number_format($state, 2)
+                        ? "{$record->value}%"
+                        : "{$record->value} BGN"
                     )
-                    ->weight('medium'),
+                    ->sortable(),
 
-                Tables\Columns\TextColumn::make('min_purchase_amount')
+                Tables\Columns\TextColumn::make('min_purchase')
                     ->label('Min. Purchase')
-                    ->money('EUR')
-                    ->placeholder('No minimum')
-                    ->toggleable(),
+                    ->money('BGN')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('usage_count')
-                    ->label('Usage')
+                Tables\Columns\TextColumn::make('usage_limit')
+                    ->label('Limit')
+                    ->formatStateUsing(fn ($state): string => $state > 0 ? (string) $state : 'Unlimited')
+                    ->alignCenter(),
+
+                Tables\Columns\TextColumn::make('used_count')
+                    ->label('Used')
+                    ->sortable()
                     ->alignCenter()
                     ->badge()
-                    ->color('info')
-                    ->formatStateUsing(fn ($state, $record) =>
-                    $record->usage_limit
-                        ? $state . ' / ' . $record->usage_limit
-                        : $state . ' / ∞'
+                    ->color(fn ($record) =>
+                    $record->usage_limit > 0 && $record->used_count >= $record->usage_limit
+                        ? 'danger'
+                        : 'success'
                     ),
+
+                Tables\Columns\TextColumn::make('valid_from')
+                    ->label('Valid From')
+                    ->dateTime('d/m/Y')
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('valid_until')
+                    ->label('Valid Until')
+                    ->dateTime('d/m/Y')
+                    ->sortable()
+                    ->placeholder('—'),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
                     ->alignCenter()
                     ->sortable(),
-
-                Tables\Columns\TextColumn::make('starts_at')
-                    ->label('Valid From')
-                    ->dateTime()
-                    ->placeholder('Immediately')
-                    ->toggleable(isToggledHiddenByDefault: true),
-
-                Tables\Columns\TextColumn::make('expires_at')
-                    ->label('Expires')
-                    ->dateTime()
-                    ->placeholder('Never')
-                    ->sortable()
-                    ->color(fn ($state) => $state && now()->gt($state) ? 'danger' : null),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -216,83 +195,34 @@ class CouponResource extends Resource
 
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Active')
-                    ->placeholder('All coupons')
+                    ->placeholder('All')
                     ->trueLabel('Active only')
                     ->falseLabel('Inactive only'),
 
-                Tables\Filters\Filter::make('expired')
-                    ->label('Expired')
-                    ->query(fn ($query) => $query->where('expires_at', '<', now())),
-
-                Tables\Filters\Filter::make('exhausted')
-                    ->label('Exhausted')
-                    ->query(fn ($query) => $query->whereNotNull('usage_limit')
-                        ->whereRaw('usage_count >= usage_limit')),
-
-                Tables\Filters\Filter::make('valid_now')
-                    ->label('Valid Now')
-                    ->query(function ($query) {
-                        return $query->where('is_active', true)
-                            ->where(function($q) {
-                                $q->whereNull('starts_at')
-                                    ->orWhere('starts_at', '<=', now());
-                            })
-                            ->where(function($q) {
-                                $q->whereNull('expires_at')
-                                    ->orWhere('expires_at', '>=', now());
-                            })
-                            ->where(function($q) {
-                                $q->whereNull('usage_limit')
-                                    ->orWhereRaw('usage_count < usage_limit');
-                            });
-                    }),
+                Tables\Filters\Filter::make('valid')
+                    ->label('Currently Valid')
+                    ->query(fn ($query) => $query
+                        ->where('is_active', true)
+                        ->where(fn ($q) => $q
+                            ->whereNull('valid_from')
+                            ->orWhere('valid_from', '<=', now())
+                        )
+                        ->where(fn ($q) => $q
+                            ->whereNull('valid_until')
+                            ->orWhere('valid_until', '>=', now())
+                        )
+                    ),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
-
-                Tables\Actions\Action::make('activate')
-                    ->label('Activate')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn ($record) => !$record->is_active)
-                    ->action(fn ($record) => $record->update(['is_active' => true])),
-
-                Tables\Actions\Action::make('deactivate')
-                    ->label('Deactivate')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->visible(fn ($record) => $record->is_active)
-                    ->action(fn ($record) => $record->update(['is_active' => false])),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
-
-                    Tables\Actions\BulkAction::make('activate')
-                        ->label('Activate Selected')
-                        ->icon('heroicon-o-check-circle')
-                        ->action(fn ($records) => $records->each->update(['is_active' => true]))
-                        ->deselectRecordsAfterCompletion()
-                        ->color('success'),
-
-                    Tables\Actions\BulkAction::make('deactivate')
-                        ->label('Deactivate Selected')
-                        ->icon('heroicon-o-x-circle')
-                        ->action(fn ($records) => $records->each->update(['is_active' => false]))
-                        ->deselectRecordsAfterCompletion()
-                        ->color('danger'),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
     }
 
     public static function getPages(): array
@@ -301,13 +231,6 @@ class CouponResource extends Resource
             'index' => Pages\ListCoupons::route('/'),
             'create' => Pages\CreateCoupon::route('/create'),
             'edit' => Pages\EditCoupon::route('/{record}/edit'),
-            'view' => Pages\ViewCoupon::route('/{record}'),
         ];
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        $activeCount = static::getModel()::where('is_active', true)->count();
-        return $activeCount > 0 ? (string) $activeCount : null;
     }
 }

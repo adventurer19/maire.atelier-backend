@@ -29,96 +29,111 @@ class CategoryResource extends Resource
                     ->schema([
                         Forms\Components\Grid::make(2)
                             ->schema([
+                                // NAME (EN)
                                 Forms\Components\TextInput::make('name.en')
                                     ->label('Name (EN)')
                                     ->required()
                                     ->maxLength(255)
                                     ->live(onBlur: true)
-                                    ->afterStateUpdated(fn ($state, callable $set) =>
-                                    $set('slug', Str::slug($state))
-                                    ),
+                                    ->afterStateUpdated(function ($state, callable $set, $get) {
+                                        if (empty($get('slug'))) {
+                                            $set('slug', Str::slug($state));
+                                        }
+                                    }),
 
+                                // NAME (BG)
                                 Forms\Components\TextInput::make('name.bg')
                                     ->label('Name (BG)')
                                     ->required()
                                     ->maxLength(255),
 
+                                // SLUG
                                 Forms\Components\TextInput::make('slug')
                                     ->required()
                                     ->unique(ignoreRecord: true)
                                     ->maxLength(255)
-                                    ->helperText('URL-friendly version of the name'),
+                                    ->helperText('URL-friendly version'),
 
+                                // PARENT CATEGORY
                                 Forms\Components\Select::make('parent_id')
                                     ->label('Parent Category')
                                     ->relationship('parent', 'name')
                                     ->searchable()
                                     ->preload()
                                     ->placeholder('None (Root Category)')
-                                    ->helperText('Select a parent category to create a subcategory'),
+                                    ->helperText('Leave empty for root category'),
                             ]),
 
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\Textarea::make('description.en')
-                                    ->label('Description (EN)')
-                                    ->rows(3)
-                                    ->maxLength(500),
+                        // DESCRIPTION
+                        Forms\Components\Textarea::make('description.en')
+                            ->label('Description (EN)')
+                            ->rows(3)
+                            ->maxLength(1000)
+                            ->columnSpanFull(),
 
-                                Forms\Components\Textarea::make('description.bg')
-                                    ->label('Description (BG)')
-                                    ->rows(3)
-                                    ->maxLength(500),
-                            ]),
-                    ]),
+                        Forms\Components\Textarea::make('description.bg')
+                            ->label('Description (BG)')
+                            ->rows(3)
+                            ->maxLength(1000)
+                            ->columnSpanFull(),
 
-                Forms\Components\Section::make('SEO Settings')
-                    ->collapsible()
-                    ->collapsed()
+                        // IMAGE URL
+                        Forms\Components\TextInput::make('image')
+                            ->label('Image URL')
+                            ->url()
+                            ->maxLength(500)
+                            ->columnSpanFull()
+                            ->helperText('Enter image URL or upload to storage'),
+
+                        // POSITION
+                        Forms\Components\TextInput::make('position')
+                            ->label('Display Order')
+                            ->numeric()
+                            ->default(0)
+                            ->minValue(0)
+                            ->helperText('Lower numbers appear first'),
+                    ])->columns(2),
+
+                // SEO
+                Forms\Components\Section::make('SEO')
                     ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('meta_title.en')
-                                    ->label('Meta Title (EN)')
-                                    ->maxLength(60)
-                                    ->helperText('Max 60 characters for SEO'),
+                        Forms\Components\TextInput::make('meta_title.en')
+                            ->label('Meta Title (EN)')
+                            ->maxLength(255),
 
-                                Forms\Components\TextInput::make('meta_title.bg')
-                                    ->label('Meta Title (BG)')
-                                    ->maxLength(60),
-                            ]),
+                        Forms\Components\TextInput::make('meta_title.bg')
+                            ->label('Meta Title (BG)')
+                            ->maxLength(255),
 
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\Textarea::make('meta_description.en')
-                                    ->label('Meta Description (EN)')
-                                    ->maxLength(160)
-                                    ->rows(3)
-                                    ->helperText('Max 160 characters for SEO'),
+                        Forms\Components\Textarea::make('meta_description.en')
+                            ->label('Meta Description (EN)')
+                            ->rows(2)
+                            ->maxLength(500),
 
-                                Forms\Components\Textarea::make('meta_description.bg')
-                                    ->label('Meta Description (BG)')
-                                    ->maxLength(160)
-                                    ->rows(3),
-                            ]),
-                    ]),
+                        Forms\Components\Textarea::make('meta_description.bg')
+                            ->label('Meta Description (BG)')
+                            ->rows(2)
+                            ->maxLength(500),
+                    ])->columns(2)->collapsible()->collapsed(),
 
-                Forms\Components\Section::make('Settings')
+                // STATUS
+                Forms\Components\Section::make('Visibility')
                     ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('position')
-                                    ->numeric()
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->helperText('Order in which categories are displayed'),
+                        Forms\Components\Toggle::make('is_active')
+                            ->label('Active')
+                            ->default(true)
+                            ->helperText('Category is visible on storefront'),
 
-                                Forms\Components\Toggle::make('is_active')
-                                    ->label('Active')
-                                    ->default(true)
-                                    ->helperText('Show category on storefront'),
-                            ]),
-                    ]),
+                        Forms\Components\Toggle::make('is_featured')
+                            ->label('Featured')
+                            ->default(false)
+                            ->helperText('Show in featured sections'),
+
+                        Forms\Components\Toggle::make('show_in_menu')
+                            ->label('Show in Menu')
+                            ->default(true)
+                            ->helperText('Display in navigation menu'),
+                    ])->columns(3),
             ]);
     }
 
@@ -127,6 +142,7 @@ class CategoryResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
+                    ->label('Category Name')
                     ->searchable()
                     ->sortable()
                     ->wrap()
@@ -162,6 +178,12 @@ class CategoryResource extends Resource
                     ->alignCenter()
                     ->sortable(),
 
+                Tables\Columns\IconColumn::make('show_in_menu')
+                    ->label('In Menu')
+                    ->boolean()
+                    ->alignCenter()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -179,9 +201,11 @@ class CategoryResource extends Resource
                     ->relationship('parent', 'name')
                     ->placeholder('All categories'),
 
-                Tables\Filters\Filter::make('root_only')
-                    ->label('Root Categories Only')
-                    ->query(fn ($query) => $query->whereNull('parent_id')),
+                Tables\Filters\TernaryFilter::make('show_in_menu')
+                    ->label('In Menu')
+                    ->placeholder('All')
+                    ->trueLabel('Show in menu')
+                    ->falseLabel('Hidden from menu'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -191,31 +215,8 @@ class CategoryResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
-
-                    Tables\Actions\BulkAction::make('activate')
-                        ->label('Activate')
-                        ->icon('heroicon-o-check-circle')
-                        ->action(fn ($records) => $records->each->update(['is_active' => true]))
-                        ->deselectRecordsAfterCompletion()
-                        ->color('success'),
-
-                    Tables\Actions\BulkAction::make('deactivate')
-                        ->label('Deactivate')
-                        ->icon('heroicon-o-x-circle')
-                        ->action(fn ($records) => $records->each->update(['is_active' => false]))
-                        ->deselectRecordsAfterCompletion()
-                        ->color('danger'),
                 ]),
-            ])
-            ->defaultSort('position', 'asc')
-            ->reorderable('position');
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
+            ]);
     }
 
     public static function getPages(): array
@@ -225,10 +226,5 @@ class CategoryResource extends Resource
             'create' => Pages\CreateCategory::route('/create'),
             'edit' => Pages\EditCategory::route('/{record}/edit'),
         ];
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return static::getModel()::count();
     }
 }

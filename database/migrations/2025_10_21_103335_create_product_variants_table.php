@@ -22,6 +22,8 @@ return new class extends Migration
             $table->integer('stock_quantity')->default(0);
             $table->boolean('is_active')->default(true);
 
+            $table->softDeletes();
+
             $table->timestamps();
 
             // 🔒 Ensure uniqueness per product variant SKU if exists

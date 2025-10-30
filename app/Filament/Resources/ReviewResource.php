@@ -56,37 +56,27 @@ class ReviewResource extends Resource
                             ->native(false),
 
                         Forms\Components\TextInput::make('title')
+                            ->label('Review Title')
                             ->maxLength(255)
-                            ->placeholder('Review title (optional)'),
+                            ->placeholder('e.g., Great product!'),
 
                         Forms\Components\Textarea::make('comment')
+                            ->label('Comment')
                             ->rows(4)
                             ->maxLength(1000)
-                            ->columnSpanFull(),
-                    ]),
+                            ->columnSpanFull()
+                            ->placeholder('Write your review here...'),
 
-                Forms\Components\Section::make('Review Status')
-                    ->schema([
-                        Forms\Components\Grid::make(3)
-                            ->schema([
-                                Forms\Components\Toggle::make('is_approved')
-                                    ->label('Approved')
-                                    ->default(false)
-                                    ->helperText('Only approved reviews will be visible on storefront'),
+                        Forms\Components\Toggle::make('is_verified')
+                            ->label('Verified Purchase')
+                            ->default(false)
+                            ->helperText('Mark if customer purchased this product'),
 
-                                Forms\Components\Toggle::make('is_verified_purchase')
-                                    ->label('Verified Purchase')
-                                    ->default(false)
-                                    ->helperText('Customer actually purchased this product'),
-
-                                Forms\Components\TextInput::make('helpful_count')
-                                    ->label('Helpful Count')
-                                    ->numeric()
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->helperText('Number of users who found this helpful'),
-                            ]),
-                    ]),
+                        Forms\Components\Toggle::make('is_approved')
+                            ->label('Approved')
+                            ->default(false)
+                            ->helperText('Only approved reviews will be visible on site'),
+                    ])->columns(2),
             ]);
     }
 
@@ -94,47 +84,39 @@ class ReviewResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('user.name')
+                    ->label('Customer')
+                    ->searchable()
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('product.name')
                     ->label('Product')
                     ->searchable()
                     ->sortable()
-                    ->limit(30)
-                    ->wrap()
-                    ->weight('medium'),
-
-                Tables\Columns\TextColumn::make('user.name')
-                    ->label('Customer')
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable(),
+                    ->limit(40)
+                    ->wrap(),
 
                 Tables\Columns\TextColumn::make('rating')
                     ->sortable()
-                    ->alignCenter()
                     ->badge()
-                    ->formatStateUsing(fn ($state) => str_repeat('⭐', $state))
-                    ->color(fn ($state) => match (true) {
+                    ->color(fn (int $state): string => match (true) {
                         $state >= 4 => 'success',
                         $state === 3 => 'warning',
                         default => 'danger',
-                    }),
+                    })
+                    ->formatStateUsing(fn (int $state): string => str_repeat('⭐', $state)),
 
                 Tables\Columns\TextColumn::make('title')
+                    ->label('Title')
+                    ->searchable()
                     ->limit(30)
-                    ->wrap()
-                    ->toggleable()
-                    ->placeholder('No title'),
+                    ->placeholder('—'),
 
-                Tables\Columns\TextColumn::make('comment')
-                    ->limit(50)
-                    ->wrap()
-                    ->toggleable(),
-
-                Tables\Columns\IconColumn::make('is_verified_purchase')
+                Tables\Columns\IconColumn::make('is_verified')
                     ->label('Verified')
                     ->boolean()
                     ->alignCenter()
-                    ->toggleable(),
+                    ->sortable(),
 
                 Tables\Columns\IconColumn::make('is_approved')
                     ->label('Approved')
@@ -142,118 +124,60 @@ class ReviewResource extends Resource
                     ->alignCenter()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('helpful_count')
-                    ->label('Helpful')
-                    ->alignCenter()
-                    ->badge()
-                    ->color('info')
-                    ->sortable()
-                    ->toggleable(),
-
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Date')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->dateTime('d/m/Y')
+                    ->sortable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('rating')
                     ->options([
-                        5 => '⭐⭐⭐⭐⭐ (5 stars)',
-                        4 => '⭐⭐⭐⭐ (4 stars)',
-                        3 => '⭐⭐⭐ (3 stars)',
-                        2 => '⭐⭐ (2 stars)',
-                        1 => '⭐ (1 star)',
-                    ])
-                    ->multiple(),
+                        5 => '5 Stars',
+                        4 => '4 Stars',
+                        3 => '3 Stars',
+                        2 => '2 Stars',
+                        1 => '1 Star',
+                    ]),
 
-                Tables\Filters\TernaryFilter::make('is_approved')
-                    ->label('Approval Status')
-                    ->placeholder('All reviews')
-                    ->trueLabel('Approved only')
-                    ->falseLabel('Pending approval'),
-
-                Tables\Filters\TernaryFilter::make('is_verified_purchase')
+                Tables\Filters\TernaryFilter::make('is_verified')
                     ->label('Verified Purchase')
-                    ->placeholder('All reviews')
+                    ->placeholder('All')
                     ->trueLabel('Verified only')
                     ->falseLabel('Not verified'),
 
-                Tables\Filters\Filter::make('created_at')
-                    ->form([
-                        Forms\Components\DatePicker::make('created_from')
-                            ->label('From'),
-                        Forms\Components\DatePicker::make('created_until')
-                            ->label('Until'),
-                    ])
-                    ->query(function ($query, array $data) {
-                        return $query
-                            ->when($data['created_from'], fn ($q, $date) => $q->whereDate('created_at', '>=', $date))
-                            ->when($data['created_until'], fn ($q, $date) => $q->whereDate('created_at', '<=', $date));
-                    }),
-
-                Tables\Filters\SelectFilter::make('product')
-                    ->relationship('product', 'name')
-                    ->searchable()
-                    ->preload(),
+                Tables\Filters\TernaryFilter::make('is_approved')
+                    ->label('Approved')
+                    ->placeholder('All')
+                    ->trueLabel('Approved only')
+                    ->falseLabel('Pending approval'),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
 
+                // Quick approve action
                 Tables\Actions\Action::make('approve')
-                    ->label('Approve')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->action(fn ($record) => $record->update(['is_approved' => true]))
-                    ->visible(fn ($record) => !$record->is_approved)
-                    ->requiresConfirmation(),
-
-                Tables\Actions\Action::make('reject')
-                    ->label('Reject')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->action(fn ($record) => $record->update(['is_approved' => false]))
-                    ->visible(fn ($record) => $record->is_approved)
+                    ->action(fn (Review $record) => $record->update(['is_approved' => true]))
+                    ->visible(fn (Review $record) => !$record->is_approved)
                     ->requiresConfirmation(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
 
+                    // Bulk approve
                     Tables\Actions\BulkAction::make('approve')
                         ->label('Approve Selected')
                         ->icon('heroicon-o-check-circle')
-                        ->action(fn ($records) => $records->each->update(['is_approved' => true]))
-                        ->deselectRecordsAfterCompletion()
                         ->color('success')
-                        ->requiresConfirmation(),
-
-                    Tables\Actions\BulkAction::make('reject')
-                        ->label('Reject Selected')
-                        ->icon('heroicon-o-x-circle')
-                        ->action(fn ($records) => $records->each->update(['is_approved' => false]))
-                        ->deselectRecordsAfterCompletion()
-                        ->color('danger')
-                        ->requiresConfirmation(),
-
-                    Tables\Actions\BulkAction::make('mark_verified')
-                        ->label('Mark as Verified Purchase')
-                        ->icon('heroicon-o-shield-check')
-                        ->action(fn ($records) => $records->each->update(['is_verified_purchase' => true]))
-                        ->deselectRecordsAfterCompletion()
-                        ->color('info'),
+                        ->action(fn ($records) => $records->each->update(['is_approved' => true]))
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
     }
 
     public static function getPages(): array
@@ -262,18 +186,6 @@ class ReviewResource extends Resource
             'index' => Pages\ListReviews::route('/'),
             'create' => Pages\CreateReview::route('/create'),
             'edit' => Pages\EditReview::route('/{record}/edit'),
-            'view' => Pages\ViewReview::route('/{record}'),
         ];
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        $pendingCount = static::getModel()::where('is_approved', false)->count();
-        return $pendingCount > 0 ? (string) $pendingCount : null;
-    }
-
-    public static function getNavigationBadgeColor(): ?string
-    {
-        return static::getModel()::where('is_approved', false)->count() > 0 ? 'warning' : null;
     }
 }

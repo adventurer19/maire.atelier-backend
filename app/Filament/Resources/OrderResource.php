@@ -10,7 +10,6 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Support\Colors\Color;
 
 class OrderResource extends Resource
 {
@@ -42,8 +41,15 @@ class OrderResource extends Resource
                             ->relationship('user', 'name')
                             ->searchable()
                             ->preload()
-                            ->required()
-                            ->label('Customer'),
+                            ->label('Customer')
+                            ->helperText('Leave empty for guest orders'),
+
+                        Forms\Components\TextInput::make('guest_email')
+                            ->label('Guest Email')
+                            ->email()
+                            ->maxLength(255)
+                            ->visible(fn ($get) => empty($get('user_id')))
+                            ->helperText('For guest checkout'),
 
                         Forms\Components\Grid::make(2)
                             ->schema([
@@ -72,88 +78,83 @@ class OrderResource extends Resource
                                     ->native(false),
                             ]),
 
-                        Forms\Components\Select::make('payment_method')
-                            ->options([
-                                'credit_card' => 'Credit Card',
-                                'paypal' => 'PayPal',
-                                'bank_transfer' => 'Bank Transfer',
-                                'cash_on_delivery' => 'Cash on Delivery',
-                            ])
-                            ->native(false),
-                    ]),
+                        Forms\Components\TextInput::make('payment_method')
+                            ->label('Payment Method')
+                            ->maxLength(50)
+                            ->placeholder('e.g., Stripe, PayPal, Cash on Delivery'),
+                    ])->columns(1),
 
-                Forms\Components\Section::make('Order Totals')
+                Forms\Components\Section::make('Pricing')
                     ->schema([
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\TextInput::make('subtotal')
+                                    ->label('Subtotal')
                                     ->numeric()
-                                    ->prefix('€')
-                                    ->required()
-                                    ->minValue(0)
-                                    ->step(0.01),
-
-                                Forms\Components\TextInput::make('shipping_cost')
-                                    ->label('Shipping')
-                                    ->numeric()
-                                    ->prefix('€')
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->step(0.01),
-
-                                Forms\Components\TextInput::make('tax')
-                                    ->numeric()
-                                    ->prefix('€')
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->step(0.01),
-
-                                Forms\Components\TextInput::make('discount')
-                                    ->numeric()
-                                    ->prefix('€')
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->step(0.01),
-
-                                Forms\Components\TextInput::make('total')
-                                    ->numeric()
-                                    ->prefix('€')
                                     ->required()
                                     ->minValue(0)
                                     ->step(0.01)
-                                    ->columnSpanFull(),
-                            ]),
+                                    ->prefix('BGN')
+                                    ->default(0),
 
-                        Forms\Components\Select::make('currency')
-                            ->options([
-                                'EUR' => 'EUR (€)',
-                                'USD' => 'USD ($)',
-                                'BGN' => 'BGN (лв)',
-                            ])
-                            ->default('EUR')
-                            ->required(),
-                    ]),
+                                Forms\Components\TextInput::make('discount')
+                                    ->label('Discount')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->step(0.01)
+                                    ->prefix('BGN')
+                                    ->default(0),
+
+                                Forms\Components\TextInput::make('shipping_cost')
+                                    ->label('Shipping Cost')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->step(0.01)
+                                    ->prefix('BGN')
+                                    ->default(0),
+
+                                Forms\Components\TextInput::make('tax')
+                                    ->label('Tax (VAT)')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->step(0.01)
+                                    ->prefix('BGN')
+                                    ->default(0),
+
+                                Forms\Components\TextInput::make('total')
+                                    ->label('Total')
+                                    ->numeric()
+                                    ->required()
+                                    ->minValue(0)
+                                    ->step(0.01)
+                                    ->prefix('BGN')
+                                    ->default(0)
+                                    ->columnSpanFull()
+                                    ->extraAttributes(['class' => 'font-bold']),
+                            ]),
+                    ])->columns(1),
 
                 Forms\Components\Section::make('Additional Information')
                     ->schema([
                         Forms\Components\Textarea::make('notes')
+                            ->label('Order Notes')
                             ->rows(3)
+                            ->maxLength(1000)
+                            ->placeholder('Customer notes, special requests, etc.')
                             ->columnSpanFull(),
 
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('customer_ip')
-                                    ->label('Customer IP')
-                                    ->disabled(),
+                        Forms\Components\DateTimePicker::make('shipped_at')
+                            ->label('Shipped At')
+                            ->displayFormat('d/m/Y H:i'),
 
-                                Forms\Components\Textarea::make('user_agent')
-                                    ->label('User Agent')
-                                    ->rows(2)
-                                    ->disabled(),
-                            ]),
-                    ])
-                    ->collapsible()
-                    ->collapsed(),
+                        Forms\Components\DateTimePicker::make('delivered_at')
+                            ->label('Delivered At')
+                            ->displayFormat('d/m/Y H:i'),
+
+                        Forms\Components\DateTimePicker::make('cancelled_at')
+                            ->label('Cancelled At')
+                            ->displayFormat('d/m/Y H:i'),
+                    ])->columns(3)->collapsible(),
             ]);
     }
 
@@ -162,72 +163,54 @@ class OrderResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('order_number')
+                    ->label('Order #')
                     ->searchable()
                     ->sortable()
-                    ->weight('bold')
                     ->copyable()
-                    ->tooltip('Click to copy'),
+                    ->weight('bold')
+                    ->color('primary'),
 
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('Customer')
                     ->searchable()
                     ->sortable()
-                    ->toggleable(),
+                    ->placeholder('Guest')
+                    ->description(fn ($record) => $record->guest_email),
 
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'pending' => 'warning',
+                        'pending' => 'gray',
                         'processing' => 'info',
-                        'shipped' => 'primary',
+                        'shipped' => 'warning',
                         'delivered' => 'success',
                         'cancelled' => 'danger',
-                        'refunded' => 'gray',
+                        'refunded' => 'purple',
+                        default => 'gray',
                     })
-                    ->sortable()
-                    ->searchable(),
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('payment_status')
                     ->label('Payment')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'pending' => 'warning',
+                        'pending' => 'gray',
                         'paid' => 'success',
                         'failed' => 'danger',
-                        'refunded' => 'gray',
+                        'refunded' => 'warning',
+                        default => 'gray',
                     })
-                    ->sortable()
-                    ->searchable(),
-
-                Tables\Columns\TextColumn::make('payment_method')
-                    ->label('Method')
-                    ->toggleable()
-                    ->placeholder('N/A')
-                    ->formatStateUsing(fn ($state) => match($state) {
-                        'credit_card' => 'Credit Card',
-                        'paypal' => 'PayPal',
-                        'bank_transfer' => 'Bank Transfer',
-                        'cash_on_delivery' => 'COD',
-                        default => 'N/A',
-                    }),
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('total')
-                    ->money('EUR')
+                    ->money('BGN')
                     ->sortable()
                     ->weight('bold'),
 
-                Tables\Columns\TextColumn::make('items_count')
-                    ->label('Items')
-                    ->counts('items')
-                    ->badge()
-                    ->color('info')
-                    ->alignCenter(),
-
                 Tables\Columns\TextColumn::make('created_at')
-                    ->label('Date')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(),
+                    ->label('Order Date')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
@@ -238,8 +221,7 @@ class OrderResource extends Resource
                         'delivered' => 'Delivered',
                         'cancelled' => 'Cancelled',
                         'refunded' => 'Refunded',
-                    ])
-                    ->multiple(),
+                    ]),
 
                 Tables\Filters\SelectFilter::make('payment_status')
                     ->label('Payment Status')
@@ -248,68 +230,29 @@ class OrderResource extends Resource
                         'paid' => 'Paid',
                         'failed' => 'Failed',
                         'refunded' => 'Refunded',
-                    ])
-                    ->multiple(),
-
-                Tables\Filters\SelectFilter::make('payment_method')
-                    ->options([
-                        'credit_card' => 'Credit Card',
-                        'paypal' => 'PayPal',
-                        'bank_transfer' => 'Bank Transfer',
-                        'cash_on_delivery' => 'Cash on Delivery',
-                    ])
-                    ->multiple(),
+                    ]),
 
                 Tables\Filters\Filter::make('created_at')
                     ->form([
                         Forms\Components\DatePicker::make('created_from')
-                            ->label('From'),
+                            ->label('From Date'),
                         Forms\Components\DatePicker::make('created_until')
-                            ->label('Until'),
+                            ->label('Until Date'),
                     ])
                     ->query(function ($query, array $data) {
                         return $query
-                            ->when($data['created_from'], fn ($q, $date) => $q->whereDate('created_at', '>=', $date))
-                            ->when($data['created_until'], fn ($q, $date) => $q->whereDate('created_at', '<=', $date));
+                            ->when($data['created_from'], fn ($q) => $q->whereDate('created_at', '>=', $data['created_from']))
+                            ->when($data['created_until'], fn ($q) => $q->whereDate('created_at', '<=', $data['created_until']));
                     }),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
-
-                Tables\Actions\Action::make('mark_as_paid')
-                    ->label('Mark Paid')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn ($record) => $record->payment_status !== 'paid')
-                    ->action(fn ($record) => $record->markAsPaid())
-                    ->requiresConfirmation(),
-
-                Tables\Actions\Action::make('mark_as_shipped')
-                    ->label('Mark Shipped')
-                    ->icon('heroicon-o-truck')
-                    ->color('info')
-                    ->visible(fn ($record) => !in_array($record->status, ['shipped', 'delivered', 'cancelled']))
-                    ->action(fn ($record) => $record->markAsShipped())
-                    ->requiresConfirmation(),
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
-
-                    Tables\Actions\BulkAction::make('mark_as_processing')
-                        ->label('Mark as Processing')
-                        ->icon('heroicon-o-arrow-path')
-                        ->action(fn ($records) => $records->each->update(['status' => 'processing']))
-                        ->deselectRecordsAfterCompletion()
-                        ->color('info'),
-
-                    Tables\Actions\BulkAction::make('mark_as_shipped')
-                        ->label('Mark as Shipped')
-                        ->icon('heroicon-o-truck')
-                        ->action(fn ($records) => $records->each->update(['status' => 'shipped']))
-                        ->deselectRecordsAfterCompletion()
-                        ->color('primary'),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -328,17 +271,7 @@ class OrderResource extends Resource
             'index' => Pages\ListOrders::route('/'),
             'create' => Pages\CreateOrder::route('/create'),
             'edit' => Pages\EditOrder::route('/{record}/edit'),
-            'view' => Pages\ViewOrder::route('/{record}'),
+            'view'   => Pages\ViewOrder::route('/{record}'),
         ];
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return static::getModel()::where('status', 'pending')->count();
-    }
-
-    public static function getNavigationBadgeColor(): ?string
-    {
-        return static::getModel()::where('status', 'pending')->count() > 0 ? 'warning' : 'gray';
     }
 }

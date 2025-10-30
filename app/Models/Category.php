@@ -178,11 +178,4 @@ class Category extends Model
             : null;
     }
 
-    /**
-     * Get translated meta title fallback to name.
-     */
-    public function getMetaTitleAttribute(): string
-    {
-        return $this->getTranslation('meta_title', app()->getLocale()) ?: $this->getTranslation('name', app()->getLocale());
-    }
 }

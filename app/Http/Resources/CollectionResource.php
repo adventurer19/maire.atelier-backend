@@ -37,10 +37,7 @@ class CollectionResource extends JsonResource
             'is_featured' => $this->is_featured,
             'position' => $this->position,
 
-            // 🧠 Conditions (for smart/auto collections)
             'conditions' => $this->conditions ?? null,
-
-            // 🛍️ Related products (only if loaded)
             'products' => ProductResource::collection($this->whenLoaded('products')),
 
             // 🕓 Meta

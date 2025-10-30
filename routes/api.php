@@ -48,7 +48,7 @@ Route::prefix('products')->group(function () {
 // 🗂️ Categories
 Route::prefix('categories')->group(function () {
     Route::get('/', [CategoryController::class, 'index']);
-    Route::get('/{category:slug}', [CategoryController::class, 'show']);
+    Route::get('/{category:slug}', [CategoryController::class, 'show'])->name('categories.show');
 });
 
 // 🎯 Collections

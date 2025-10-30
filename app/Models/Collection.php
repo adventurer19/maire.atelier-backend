@@ -196,14 +196,6 @@ class Collection extends Model
             : asset('storage/' . $this->image);
     }
 
-    /**
-     * Get meta title with fallback to name.
-     */
-    public function getMetaTitleAttribute(): string
-    {
-        return $this->getTranslation('meta_title', app()->getLocale())
-            ?: $this->getTranslation('name', app()->getLocale());
-    }
 
     /**
      * Get short description for cards/lists.

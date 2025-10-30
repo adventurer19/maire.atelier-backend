@@ -12,7 +12,7 @@ class ProductResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $locale = app()->getLocale(); // SetLocale middleware already handled this
+        $locale = app()->getLocale();
 
         return [
             'id' => $this->id,
@@ -23,8 +23,6 @@ class ProductResource extends JsonResource
             'name' => $this->getTranslation('name', $locale),
             'description' => $this->getTranslation('description', $locale),
             'short_description' => $this->getTranslation('short_description', $locale),
-            'material' => $this->getTranslation('material', $locale),
-            'care_instructions' => $this->getTranslation('care_instructions', $locale),
             'meta_title' => $this->getTranslation('meta_title', $locale),
             'meta_description' => $this->getTranslation('meta_description', $locale),
 
@@ -38,33 +36,36 @@ class ProductResource extends JsonResource
             'is_in_stock' => $this->isInStock(),
             'is_low_stock' => $this->isLowStock(),
             'stock_quantity' => $this->stock_quantity,
-            'stock_status' => $this->stock_status,
 
             // ⚙️ Flags
-            'is_active' => $this->is_active,
-            'is_featured' => $this->is_featured,
-            'requires_shipping' => $this->requires_shipping,
-            'is_taxable' => $this->is_taxable,
-
-            // ⚖️ Dimensions
-            'weight' => $this->weight,
-            'width' => $this->width,
-            'height' => $this->height,
-            'depth' => $this->depth,
+            'is_active' => (bool) $this->is_active,
+            'is_featured' => (bool) $this->is_featured,
+            'requires_shipping' => (bool) $this->requires_shipping,
 
             // 🖼️ Images
             'thumbnail' => $this->getThumbnailUrl(),
             'primary_image' => $this->getPrimaryImageUrl(),
             'images' => $this->getAllImageUrls(),
 
-            // 🔗 Relationships (lazy loaded only if requested with ->load())
-            'categories' => CategoryResource::collection($this->whenLoaded('categories')),
-            'collections' => CollectionResource::collection($this->whenLoaded('collections')),
-            'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),
+            'categories' => $this->whenLoaded('categories', function () {
+                return $this->categories->map(function ($category) {
+                    return [
+                        'id'   => $category->id,
+                        'slug' => $category->slug,
+                        'name' => $category->getTranslation('name', app()->getLocale()),
+                    ];
+                });
+            }),
+
+            'variants' => $this->whenLoaded('variants', function () {
+                return ProductVariantResource::collection(
+                    $this->variants->map->withoutRelations()
+                );
+            }),
 
             // 📆 Meta
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => optional($this->created_at)->toISOString(),
+            'updated_at' => optional($this->updated_at)->toISOString(),
         ];
     }
 }

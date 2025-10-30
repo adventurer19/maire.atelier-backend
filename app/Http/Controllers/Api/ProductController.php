@@ -3,30 +3,25 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Concerns\ApiResponse;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
-    use ApiResponse;
-
     /**
      * GET /api/products
      * List all active products with optional category filter and pagination.
      */
     public function index(Request $request)
     {
-        $perPage = (int) $request->input('per_page', 12);
-        $categoryId = $request->input('category_id');
+        $perPage = (int) $request->query('per_page', 12);
+        $categoryId = $request->query('category_id');
 
         $query = Product::query()
             ->with(['categories', 'variants.attributeOptions', 'media'])
             ->where('is_active', true)
             ->orderByDesc('created_at');
-
 
         if ($categoryId) {
             $query->whereHas('categories', fn($q) => $q->where('categories.id', $categoryId));
@@ -41,9 +36,9 @@ class ProductController extends Controller
      * GET /api/products/featured
      * Retrieve featured products (non-paginated).
      */
-    public function featured(Request $request): JsonResponse
+    public function featured(Request $request)
     {
-        $limit = (int) $request->input('limit', 8);
+        $limit = (int) $request->query('limit', 8);
 
         $products = Product::query()
             ->with(['categories', 'media'])
@@ -53,14 +48,19 @@ class ProductController extends Controller
             ->limit($limit)
             ->get();
 
-        return $this->ok(ProductResource::collection($products));
+        return response()->json([
+            'data' => ProductResource::collection($products),
+            'meta' => [
+                'count' => $products->count(),
+            ],
+        ]);
     }
 
     /**
      * GET /api/products/{slug}
      * Retrieve a single product by slug.
      */
-    public function show(string $slug): JsonResponse
+    public function show(string $slug)
     {
         $product = Product::query()
             ->with(['categories', 'variants.attributeOptions', 'media', 'reviews'])
@@ -68,20 +68,19 @@ class ProductController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (! $product) {
-            return $this->error('NOT_FOUND', __('common.not_found'), [], 404);
-        }
+        abort_if(!$product, 404, __('Product not found.'));
 
-        return $this->ok(new ProductResource($product));
+        return new ProductResource($product);
     }
 
     /**
      * GET /api/search?q=dress
      * Search products by keyword with pagination.
      */
-    public function search(Request $request): JsonResponse
+    public function search(Request $request)
     {
         $queryString = trim($request->input('q', ''));
+
         $perPage = (int) $request->input('per_page', 12);
 
         if ($queryString === '') {
@@ -103,6 +102,17 @@ class ProductController extends Controller
             ->orderByDesc('created_at')
             ->paginate($perPage);
 
-        return $this->paginated($products, ProductResource::collection($products));
+        return response()->json([
+            'data' => ProductResource::collection($products),
+            'meta' => [
+                'pagination' => [
+                    'total' => $products->total(),
+                    'current_page' => $products->currentPage(),
+                    'last_page' => $products->lastPage(),
+                ],
+                'query' => $queryString
+            ]
+        ]);
     }
+
 }

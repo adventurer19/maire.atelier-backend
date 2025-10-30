@@ -11,6 +11,7 @@ use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 // ============================================
 // PRODUCT MODEL
@@ -100,19 +101,22 @@ class Product extends Model implements HasMedia
             ->useDisk('public')
             ->useFallbackUrl(asset('images/placeholder-product.jpg'))
             ->useFallbackPath(public_path('images/placeholder-product.jpg'))
-            ->registerMediaConversions(function () {
+            ->registerMediaConversions(function (Media $media = null) {
                 $this->addMediaConversion('thumb')
                     ->width(400)
                     ->height(400)
-                    ->sharpen(10);
+                    ->sharpen(10)
+                    ->nonQueued();
 
                 $this->addMediaConversion('medium')
                     ->width(800)
-                    ->height(800);
+                    ->height(800)
+                    ->nonQueued();
 
                 $this->addMediaConversion('large')
                     ->width(1200)
-                    ->height(1200);
+                    ->height(1200)
+                    ->nonQueued();
             });
     }
 
@@ -158,29 +162,45 @@ class Product extends Model implements HasMedia
     }
 
     // --------------------------------------------
-    // IMAGE HELPERS
+    // IMAGE HELPERS (SAFE)
     // --------------------------------------------
 
     public function getPrimaryImageUrl(): string
     {
-        return $this->getFirstMediaUrl('images', 'large') ?: asset('images/placeholder-product.jpg');
+        try {
+            return $this->getFirstMediaUrl('images', 'large') ?: asset('images/placeholder-product.jpg');
+        } catch (\Throwable $e) {
+            return asset('images/placeholder-product.jpg');
+        }
     }
 
     public function getThumbnailUrl(): string
     {
-        return $this->getFirstMediaUrl('images', 'thumb') ?: asset('images/placeholder-product.jpg');
+        try {
+            return $this->getFirstMediaUrl('images', 'thumb') ?: asset('images/placeholder-product.jpg');
+        } catch (\Throwable $e) {
+            return asset('images/placeholder-product.jpg');
+        }
     }
 
     public function getAllImageUrls(): array
     {
-        return $this->getMedia('images')
-            ->map(fn($media) => $media->getUrl())
-            ->toArray();
+        try {
+            return $this->getMedia('images')
+                ->map(fn($media) => $media->getUrl())
+                ->toArray();
+        } catch (\Throwable $e) {
+            return [asset('images/placeholder-product.jpg')];
+        }
     }
 
     public function hasImages(): bool
     {
-        return $this->hasMedia('images');
+        try {
+            return $this->hasMedia('images');
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     // --------------------------------------------

@@ -23,8 +23,8 @@ class AddressFactory extends Factory
              'first_name' => $this->faker->firstName(),
              'last_name' => $this->faker->lastName(),
              'company' => $this->faker->optional()->company(),
-             'address_line_1' => $this->faker->streetAddress(),
-             'address_line_2' => $this->faker->optional()->secondaryAddress(),
+             'address_line1' => $this->faker->streetAddress(), // ✅ без "_"
+             'address_line2' => $this->faker->optional()->secondaryAddress(),
              'city' => $this->faker->city(),
              'state' => $this->faker->state(),
              'postal_code' => $this->faker->postcode(),
@@ -32,5 +32,6 @@ class AddressFactory extends Factory
              'phone' => $this->faker->phoneNumber(),
              'is_default' => $this->faker->boolean(20),
          ];
+
      }
 }

@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('image')->nullable();
 
             // ⚙️ Logic
+            $table->unsignedInteger('sort_order')->default(0);
             $table->enum('type', ['manual', 'auto'])->default('manual');
             $table->json('conditions')->nullable(); // rules for automatic collections
 

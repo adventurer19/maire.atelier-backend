@@ -2,35 +2,30 @@
 
 namespace Database\Factories;
 
-use App\Models\Order;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\Order;
+use App\Models\OrderAddress;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\OrderAddress>
- */
 class OrderAddressFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = OrderAddress::class;
+
     public function definition(): array
     {
         return [
             'order_id' => Order::factory(),
-            'type' => $this->faker->randomElement(['billing', 'shipping']),
+            'type' => $this->faker->randomElement(['shipping', 'billing']),
             'first_name' => $this->faker->firstName(),
             'last_name' => $this->faker->lastName(),
             'company' => $this->faker->optional()->company(),
             'address_line1' => $this->faker->streetAddress(),
             'address_line2' => $this->faker->optional()->secondaryAddress(),
             'city' => $this->faker->city(),
-            'state' => $this->faker->state(),
+            'state' => $this->faker->city(),
             'postal_code' => $this->faker->postcode(),
-            'country' => $this->faker->countryCode(),
+            'country' => 'BG',
             'phone' => $this->faker->phoneNumber(),
-            'email' => fake()->optional()->email(),
+            'email' => $this->faker->safeEmail(),
         ];
     }
 }

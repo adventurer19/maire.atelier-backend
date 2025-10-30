@@ -1,5 +1,4 @@
 <?php
-// app/Http/Resources/ProductVariantResource.php
 
 namespace App\Http\Resources;
 
@@ -8,24 +7,52 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class ProductVariantResource extends JsonResource
 {
+    /**
+     * Transform the resource into an array.
+     */
     public function toArray(Request $request): array
     {
+        $locale = app()->getLocale();
+
         return [
             'id' => $this->id,
-            'sku' => $this->sku,
-            'price' => (float) $this->price,
-            'stock_quantity' => $this->stock_quantity,
+            'product_id' => $this->product_id,
+            'sku' => $this->getSku(),
+
+            // 💰 Pricing
+            'price' => $this->price,
+            'final_price' => $this->getFinalPrice(),
+
+            // 📦 Stock
             'is_active' => $this->is_active,
-            'is_in_stock' => $this->stock_quantity > 0,
-            'attributes' => $this->attributeOptions->map(function ($option) {
+            'is_in_stock' => $this->isInStock(),
+            'stock_quantity' => $this->stock_quantity,
+
+            // 🖼️ Images (fallback to product if empty)
+            'thumbnail' => $this->getThumbnailUrl(),
+            'primary_image' => $this->getPrimaryImageUrl(),
+            'images' => $this->getAllImageUrls(),
+
+            // 🎨 Attributes (translated values)
+            'attributes' => $this->attributeOptions->map(function ($option) use ($locale) {
                 return [
-                    'name' => $option->attribute->name,
-                    'value' => $option->value,
+                    'id' => $option->id,
+                    'slug' => $option->attribute->slug,
+                    'name' => $option->attribute->getTranslation('name', $locale),
+                    'value' => $option->getTranslation('value', $locale),
                     'hex_color' => $option->hex_color,
                 ];
             }),
-            'variant_name' => $this->getVariantName(),
-            'images' => $this->getMedia('images')->map(fn($media) => $media->getUrl()),
+
+            // 🏷️ Human-readable label (e.g. “Red / M - 49.99 BGN”)
+            'label' => $this->getFormattedLabel(),
+
+            // 🔗 Optional relation back to product (if loaded)
+            'product' => new ProductResource($this->whenLoaded('product')),
+
+            // 🕓 Timestamps
+            'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
         ];
     }
 }

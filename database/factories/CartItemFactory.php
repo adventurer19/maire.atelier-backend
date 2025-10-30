@@ -2,31 +2,28 @@
 
 namespace Database\Factories;
 
-use App\Models\Product;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\CartItem;
+use App\Models\User;
+use App\Models\Product;
+use App\Models\ProductVariant;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\CartItem>
- */
 class CartItemFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = CartItem::class;
+
     public function definition(): array
     {
-        $product = Product::inRandomOrder()->first();
-        $variant = $product?->variants()->inRandomOrder()->first();
+        $product = Product::inRandomOrder()->first() ?? Product::factory()->create();
+        $variant = $product->variants()->inRandomOrder()->first();
+        $quantity = $this->faker->numberBetween(1, 3);
 
         return [
-            'user_id' => User::factory(),
+            'user_id' => User::inRandomOrder()->value('id') ?? User::factory(),
             'product_id' => $product->id,
-            'session_id' => fake()->uuid(),
-            'product_variant_id' => $variant?->id,
-            'quantity' => fake()->numberBetween(1, 5),
+            'variant_id' => $variant?->id,
+            'quantity' => $quantity,
+            'created_at' => $this->faker->dateTimeBetween('-15 days', 'now'),
         ];
     }
 }

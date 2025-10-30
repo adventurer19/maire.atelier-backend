@@ -3,41 +3,54 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\Product;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Product>
- */
 class ProductFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = Product::class;
+
     public function definition(): array
     {
+        $price = $this->faker->randomFloat(2, 20, 200);
+        $compare = $this->faker->boolean(40) ? $price + $this->faker->numberBetween(5, 50) : null;
+
         return [
-            'sku' => 'PROD-' . $this->faker->unique()->numerify('####'),
+            'sku' => strtoupper($this->faker->bothify('SKU-#####')),
             'slug' => $this->faker->unique()->slug(),
-            'name' => ['en' => $this->faker->words(3, true)],
-            'description' => ['en' => $this->faker->paragraph()],
-            'short_description' => ['en' => $this->faker->sentence()],
-            'material' => ['en' => $this->faker->words(2, true)],
-            'care_instructions' => ['en' => $this->faker->sentence()],
-            'meta_title' => ['en' => $this->faker->sentence()],
-            'meta_description' => ['en' => $this->faker->paragraph()],
-            'price' => $this->faker->randomFloat(2, 10, 1000),
-            'sale_price' => $this->faker->optional(0.3)->randomFloat(2, 5, 900),
-            'compare_at_price' => $this->faker->optional()->randomFloat(2, 1000, 1500),
-            'cost_price' => $this->faker->optional()->randomFloat(2, 5, 500),
-            'is_active' => $this->faker->boolean(80),
+            'name' => [
+                'en' => ucfirst($this->faker->words(3, true)),
+                'bg' => ucfirst($this->faker->words(3, true)),
+            ],
+            'description' => [
+                'en' => $this->faker->paragraph(),
+                'bg' => $this->faker->paragraph(),
+            ],
+            'short_description' => [
+                'en' => $this->faker->sentence(),
+                'bg' => $this->faker->sentence(),
+            ],
+            'material' => [
+                'en' => $this->faker->word(),
+                'bg' => $this->faker->word(),
+            ],
+            'care_instructions' => [
+                'en' => 'Hand wash only. Do not bleach.',
+                'bg' => 'Само ръчно пране. Без избелване.',
+            ],
+            'price' => $price,
+            'compare_at_price' => $compare,
+            'cost_price' => $price * 0.6,
+            'is_active' => $this->faker->boolean(90),
             'is_featured' => $this->faker->boolean(20),
-            'stock_quantity' => $this->faker->numberBetween(0, 100),
-            'low_stock_threshold' => 5,
-            'weight' => $this->faker->optional()->randomFloat(2, 100, 5000),
-            'width' => $this->faker->optional()->randomFloat(2, 10, 100),
-            'height' => $this->faker->optional()->randomFloat(2, 10, 100),
-            'depth' => $this->faker->optional()->randomFloat(2, 10, 100),
+            'stock_quantity' => $this->faker->numberBetween(0, 40),
+            'low_stock_threshold' => 3,
+            'stock_status' => 'in_stock',
+            'is_taxable' => true,
+            'requires_shipping' => true,
+            'weight' => $this->faker->randomFloat(2, 0.2, 3),
+            'width' => $this->faker->randomFloat(2, 5, 40),
+            'height' => $this->faker->randomFloat(2, 5, 60),
+            'depth' => $this->faker->randomFloat(2, 5, 40),
         ];
     }
 }

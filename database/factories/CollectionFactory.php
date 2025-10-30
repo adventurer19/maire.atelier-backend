@@ -3,28 +3,42 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
+use App\Models\Collection;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Collection>
- */
 class CollectionFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = Collection::class;
+
     public function definition(): array
     {
+        $nameEn = ucfirst($this->faker->words(2, true));
+        $nameBg = ucfirst($this->faker->words(2, true)) . ' (BG)';
+
         return [
-            'name' => ['en' => $this->faker->unique()->words(2, true)],
-            'slug' => $this->faker->unique()->slug(),
-            'description' => ['en' => $this->faker->optional()->paragraph()],
+            'slug' => Str::slug($nameEn . '-' . uniqid()),
+            'name' => [
+                'en' => $nameEn,
+                'bg' => $nameBg,
+            ],
+            'description' => [
+                'en' => $this->faker->sentence(),
+                'bg' => $this->faker->sentence() . ' (BG)',
+            ],
+            'meta_title' => [
+                'en' => $this->faker->sentence(3),
+                'bg' => $this->faker->sentence(3) . ' (BG)',
+            ],
+            'meta_description' => [
+                'en' => $this->faker->sentence(8),
+                'bg' => $this->faker->sentence(8) . ' (BG)',
+            ],
+            'type' => $this->faker->randomElement(['manual', 'auto']),
             'is_active' => $this->faker->boolean(90),
-            'sort_order' => $this->faker->numberBetween(0, 100),
-            'meta_title' => ['en' => $this->faker->optional()->sentence()],
-            'meta_description' => ['en' => $this->faker->optional()->text(160)],
+            'is_featured' => $this->faker->boolean(20),
+            'position' => $this->faker->numberBetween(1, 10),
+            'image' => null,
+            'conditions' => null,
         ];
     }
-
 }

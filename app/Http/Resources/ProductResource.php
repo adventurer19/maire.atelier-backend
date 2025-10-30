@@ -1,5 +1,4 @@
 <?php
-// app/Http/Resources/ProductResource.php
 
 namespace App\Http\Resources;
 
@@ -13,66 +12,59 @@ class ProductResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $locale = app()->getLocale(); // SetLocale middleware already handled this
+
         return [
             'id' => $this->id,
-            'sku' => $this->sku,
             'slug' => $this->slug,
-            'name' => $this->name, // translatable (bg/en)
-            'description' => $this->description,
-            'short_description' => $this->short_description,
-            'material' => $this->material,
-            'care_instructions' => $this->care_instructions,
+            'sku' => $this->sku,
 
-            // Pricing
-            'price' => (float) $this->price,
-            'sale_price' => $this->sale_price ? (float) $this->sale_price : null,
-            'compare_at_price' => $this->compare_at_price ? (float) $this->compare_at_price : null,
-            'final_price' => $this->sale_price ? (float) $this->sale_price : (float) $this->price,
+            // 🗣️ Translatable fields
+            'name' => $this->getTranslation('name', $locale),
+            'description' => $this->getTranslation('description', $locale),
+            'short_description' => $this->getTranslation('short_description', $locale),
+            'material' => $this->getTranslation('material', $locale),
+            'care_instructions' => $this->getTranslation('care_instructions', $locale),
+            'meta_title' => $this->getTranslation('meta_title', $locale),
+            'meta_description' => $this->getTranslation('meta_description', $locale),
+
+            // 💰 Pricing
+            'price' => $this->price,
+            'compare_at_price' => $this->compare_at_price,
             'discount_percentage' => $this->getDiscountPercentage(),
+            'final_price' => $this->getFinalPrice(),
 
-            // Stock
+            // 📦 Stock info
+            'is_in_stock' => $this->isInStock(),
+            'is_low_stock' => $this->isLowStock(),
             'stock_quantity' => $this->stock_quantity,
-            'is_in_stock' => $this->stock_quantity > 0,
-            'low_stock_threshold' => $this->low_stock_threshold,
-            'is_low_stock' => $this->stock_quantity <= $this->low_stock_threshold && $this->stock_quantity > 0,
+            'stock_status' => $this->stock_status,
 
-            // Status
+            // ⚙️ Flags
             'is_active' => $this->is_active,
             'is_featured' => $this->is_featured,
+            'requires_shipping' => $this->requires_shipping,
+            'is_taxable' => $this->is_taxable,
 
-            // Dimensions (optional)
+            // ⚖️ Dimensions
             'weight' => $this->weight,
-            'dimensions' => [
-                'width' => $this->width,
-                'height' => $this->height,
-                'depth' => $this->depth,
-            ],
+            'width' => $this->width,
+            'height' => $this->height,
+            'depth' => $this->depth,
 
-            // Relationships
-            'categories' => CategoryResource::collection($this->whenLoaded('categories')),
-            'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),
-            'images' => $this->getAllImageUrls(),
+            // 🖼️ Images
+            'thumbnail' => $this->getThumbnailUrl(),
             'primary_image' => $this->getPrimaryImageUrl(),
+            'images' => $this->getAllImageUrls(),
 
-            // Meta
-            'meta_title' => $this->meta_title,
-            'meta_description' => $this->meta_description,
+            // 🔗 Relationships (lazy loaded only if requested with ->load())
+            'categories' => CategoryResource::collection($this->whenLoaded('categories')),
+            'collections' => CollectionResource::collection($this->whenLoaded('collections')),
+            'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),
 
-            // Timestamps
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
+            // 📆 Meta
+            'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
         ];
-    }
-
-    /**
-     * Calculate discount percentage
-     */
-    private function getDiscountPercentage(): ?int
-    {
-        if (!$this->sale_price || !$this->price) {
-            return null;
-        }
-
-        return round((($this->price - $this->sale_price) / $this->price) * 100);
     }
 }

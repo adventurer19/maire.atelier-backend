@@ -15,26 +15,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        \App\Models\User::factory()->count(20)->create();
-
         $this->call([
-            CategorySeeder::class,
-            AttributeSeeder::class,
-            AttributeOptionSeeder::class,
-            MediaSeeder::class,
+            UserSeeder::class,
             ProductSeeder::class,
-            ProductVariantSeeder::class,
-            ProductMediaSeeder::class,
-            CollectionSeeder::class,
-            AddressSeeder::class,
-            CartItemSeeder::class,
-            WishlistItemSeeder::class,
+            CartSeeder::class,
+            CouponSeeder::class,
             OrderSeeder::class,
+            WishlistItemSeeder::class,
             ReviewSeeder::class,
             NewsletterSubscriberSeeder::class,
-            CouponSeeder::class,
+            SettingSeeder::class,
             RedirectSeeder::class,
-            AdminUserSeeder::class,
         ]);
     }
 }

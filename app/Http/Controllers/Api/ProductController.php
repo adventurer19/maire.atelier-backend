@@ -17,7 +17,7 @@ class ProductController extends Controller
      * GET /api/products
      * List all active products with optional category filter and pagination.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
         $perPage = (int) $request->input('per_page', 12);
         $categoryId = $request->input('category_id');
@@ -27,13 +27,14 @@ class ProductController extends Controller
             ->where('is_active', true)
             ->orderByDesc('created_at');
 
+
         if ($categoryId) {
             $query->whereHas('categories', fn($q) => $q->where('categories.id', $categoryId));
         }
 
         $products = $query->paginate($perPage);
 
-        return $this->paginated($products, ProductResource::collection($products));
+        return ProductResource::collection($products);
     }
 
     /**

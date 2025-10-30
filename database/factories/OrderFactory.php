@@ -2,36 +2,53 @@
 
 namespace Database\Factories;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\Order;
+use App\Models\User;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Order>
- */
 class OrderFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = Order::class;
+
     public function definition(): array
     {
+        $statuses = [
+            Order::STATUS_PENDING,
+            Order::STATUS_PROCESSING,
+            Order::STATUS_SHIPPED,
+            Order::STATUS_DELIVERED,
+        ];
+
+        $paymentStatuses = [
+            Order::PAYMENT_PENDING,
+            Order::PAYMENT_PAID,
+            Order::PAYMENT_FAILED,
+        ];
+
+        $subtotal = $this->faker->randomFloat(2, 50, 300);
+        $shipping = $this->faker->randomFloat(2, 0, 15);
+        $tax = $this->faker->randomFloat(2, 2, 15);
+        $discount = $this->faker->randomFloat(2, 0, 20);
+
         return [
-            'user_id' => User::factory(),
-            'order_number' => 'ORD-' . fake()->unique()->numerify('####-####'),
-            'status' => fake()->randomElement(['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded']),
-            'payment_status' => fake()->randomElement(['pending', 'paid', 'failed', 'refunded']),
-            'payment_method' => fake()->randomElement(['credit_card', 'paypal', 'bank_transfer']),
-            'subtotal' => $subtotal = fake()->randomFloat(2, 50, 500),
-            'shipping_cost' => $shipping = fake()->randomFloat(2, 5, 25), // Change from 'shipping'
-            'tax' => $tax = $subtotal * 0.10,
-            'discount' => $discount = fake()->optional(0.3)->randomFloat(2, 5, 50) ?? 0,
+            'order_number' => Order::generateOrderNumber(),
+            'user_id' => User::inRandomOrder()->value('id'),
+            'guest_name' => null,
+            'guest_email' => null,
+            'guest_phone' => null,
+            'status' => $this->faker->randomElement($statuses),
+            'payment_status' => $this->faker->randomElement($paymentStatuses),
+            'payment_method' => $this->faker->randomElement(['cod', 'card', 'paypal']),
+            'subtotal' => $subtotal,
+            'shipping_total' => $shipping,
+            'tax_total' => $tax,
+            'discount_total' => $discount,
             'total' => $subtotal + $shipping + $tax - $discount,
             'currency' => 'BGN',
-            'notes' => fake()->optional()->sentence(),
-            'customer_ip' => fake()->ipv4(),
-            'user_agent' => fake()->userAgent(),
+            'notes' => $this->faker->optional()->sentence(),
+            'customer_ip' => $this->faker->ipv4(),
+            'user_agent' => $this->faker->userAgent(),
+            'created_at' => $this->faker->dateTimeBetween('-30 days', 'now'),
         ];
     }
 }

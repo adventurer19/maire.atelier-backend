@@ -3,31 +3,30 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\ProductVariant;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\OrderItem>
- */
 class OrderItemFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
-   public function definition(): array
+    public function definition(): array
     {
-        $quantity = $this->faker->numberBetween(1, 5);
-        $price = $this->faker->randomFloat(2, 10, 200);
+        $product = Product::inRandomOrder()->first() ?? Product::factory()->create();
+        $variant = $product->variants()->inRandomOrder()->first();
+
+        $quantity = $this->faker->numberBetween(1, 3);
+        $price = $variant->price ?? $product->price;
+        $total = $price * $quantity;
 
         return [
-            'order_id' => \App\Models\Order::factory(),
-            'product_id' => \App\Models\Product::factory(),
-            'product_variant_id' => null,
-            'name' => $this->faker->words(3, true),
-            'sku' => $this->faker->bothify('PROD-####'),
+            'order_id' => Order::factory(),
+            'product_id' => $product->id,
+            'variant_id' => $variant?->id,
+            'sku' => $variant?->sku ?? $product->sku,
+            'name' => $product->name['en'] ?? 'Product',
             'quantity' => $quantity,
             'price' => $price,
-            'subtotal' => $quantity * $price,
+            'total' => $total,
         ];
     }
 }

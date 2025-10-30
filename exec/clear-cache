@@ -2,7 +2,6 @@
 
 echo "🚀 Clearing Laravel caches..."
 
-# Ако използваш Sail
 ./vendor/bin/sail artisan route:clear
 ./vendor/bin/sail artisan view:clear
 ./vendor/bin/sail artisan config:clear

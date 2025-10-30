@@ -2,16 +2,16 @@
 
 namespace Database\Seeders;
 
-use App\Models\NewsletterSubscriber;
 use Illuminate\Database\Seeder;
+use App\Models\NewsletterSubscriber;
 
 class NewsletterSubscriberSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        NewsletterSubscriber::factory()->count(100)->create();
+        // 25 active, 5 unsubscribed
+        NewsletterSubscriber::factory()->count(25)->subscribed()->create();
+        NewsletterSubscriber::factory()->count(5)->unsubscribed()->create();
+        $this->command->info('💌 Newsletter subscribers seeded successfully.');
     }
 }

@@ -3,27 +3,30 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\Review;
+use App\Models\Product;
+use App\Models\User;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Review>
- */
 class ReviewFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = Review::class;
+
     public function definition(): array
     {
+        $approved = $this->faker->boolean(80); // 80% са одобрени
+        $verified = $this->faker->boolean(60); // 60% са проверени покупки
+
         return [
-            'product_id' => \App\Models\Product::factory(),
-            'user_id' => \App\Models\User::factory(),
+            'product_id' => Product::inRandomOrder()->value('id') ?? Product::factory(),
+            'user_id' => User::inRandomOrder()->value('id') ?? User::factory(),
             'rating' => $this->faker->numberBetween(1, 5),
-            'title' => $this->faker->optional()->sentence(),
+            'title' => ucfirst($this->faker->words(3, true)),
             'comment' => $this->faker->paragraph(),
-            'is_approved' => $this->faker->boolean(80),
-            'approved_at' => $this->faker->optional()->dateTimeBetween('-3 months', 'now'),
+            'is_verified_purchase' => $verified,
+            'is_approved' => $approved,
+            'helpful_count' => $this->faker->numberBetween(0, 25),
+            'ip_address' => $this->faker->ipv4(),
+            'user_agent' => $this->faker->userAgent(),
         ];
     }
 }

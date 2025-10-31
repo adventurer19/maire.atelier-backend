@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\EnsureCartToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // ✅ API middleware group
         $middleware->api(prepend: [
+            EnsureCartToken::class,
             SubstituteBindings::class,
             SecurityHeaders::class, // HTTP Shield headers
             ThrottleRequests::class . ':60,1', // rate limiting

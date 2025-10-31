@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ApiResponse;
+use App\Services\CartService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +14,10 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     use ApiResponse;
+
+    public function __construct(
+        protected CartService $cartService,
+    ) {}
 
     /**
      * POST /api/register
@@ -69,6 +74,16 @@ class AuthController extends Controller
         // Create new token (optionally revoke previous ones)
         // $user->tokens()->delete();
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        // 🛒 Merge guest cart into user cart if a guest token exists
+        $guestToken = $request->get('cart_token');
+        if ($guestToken) {
+            try {
+                $this->cartService->mergeGuestCart($guestToken, $user->id);
+            } catch (\Throwable $e) {
+                // Do not block login on merge failure
+            }
+        }
 
         return $this->ok([
             'user' => [

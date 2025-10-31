@@ -11,25 +11,25 @@ use Illuminate\Support\Facades\DB;
 class CartService
 {
     /**
-     * Get cart identifier (user_id or session_id)
+     * Get cart identifier (user_id or token)
      */
     protected function getCartIdentifier(): array
     {
         $user = auth()->user();
 
         if ($user) {
-            return ['user_id' => $user->id, 'session_id' => null];
+            return ['user_id' => $user->id, 'token' => null];
         }
 
-        // For guests, use session ID
-        $sessionId = session()->getId();
+        // ✅ Вземаме guest token от middleware-а
+        $token = request()->get('cart_token');
 
-        if (!$sessionId) {
-            session()->start();
-            $sessionId = session()->getId();
+        if (!$token) {
+            // Fallback (ако нещо липсва)
+            $token = (string) \Illuminate\Support\Str::uuid();
         }
 
-        return ['user_id' => null, 'session_id' => $sessionId];
+        return ['user_id' => null, 'token' => $token];
     }
 
     /**
@@ -44,7 +44,7 @@ class CartService
         if ($identifier['user_id']) {
             $query->where('user_id', $identifier['user_id']);
         } else {
-            $query->where('session_id', $identifier['session_id']);
+            $query->where('token', $identifier['token']);
         }
 
         return $query->with(['product', 'variant'])->get();
@@ -78,7 +78,6 @@ class CartService
         $product = Product::findOrFail($productId);
         $variant = $variantId ? ProductVariant::where('product_id', $productId)->findOrFail($variantId) : null;
 
-        // Determine stock source
         $stock = $variant?->stock_quantity ?? $product->stock_quantity;
 
         if ($stock < $quantity) {
@@ -87,13 +86,12 @@ class CartService
 
         $identifier = $this->getCartIdentifier();
 
-        // Check if item already exists
-        $existingItem = CartItem::where([
-            'product_id' => $productId,
-            'variant_id' => $variantId,
-        ])
+        // Проверяваме по user_id или token
+        $existingItem = CartItem::query()
+            ->where('product_id', $productId)
+            ->where('variant_id', $variantId)
             ->when($identifier['user_id'], fn($q) => $q->where('user_id', $identifier['user_id']))
-            ->when($identifier['session_id'], fn($q) => $q->where('session_id', $identifier['session_id']))
+            ->when($identifier['token'], fn($q) => $q->where('token', $identifier['token']))
             ->first();
 
         if ($existingItem) {
@@ -109,12 +107,13 @@ class CartService
 
         return CartItem::create([
             'user_id' => $identifier['user_id'],
-            'session_id' => $identifier['session_id'],
+            'token' => $identifier['token'], // ✅ заменено от session_id
             'product_id' => $productId,
             'variant_id' => $variantId,
             'quantity' => $quantity,
         ]);
     }
+
 
     /**
      * Update cart item quantity
@@ -125,7 +124,7 @@ class CartService
 
         $item = CartItem::where('id', $cartItemId)
             ->when($identifier['user_id'], fn($q) => $q->where('user_id', $identifier['user_id']))
-            ->when($identifier['session_id'], fn($q) => $q->where('session_id', $identifier['session_id']))
+            ->when($identifier['token'], fn($q) => $q->where('token', $identifier['token']))
             ->firstOrFail();
 
         $stock = $item->variant?->stock_quantity ?? $item->product->stock_quantity;
@@ -153,7 +152,7 @@ class CartService
 
         return CartItem::where('id', $cartItemId)
                 ->when($identifier['user_id'], fn($q) => $q->where('user_id', $identifier['user_id']))
-                ->when($identifier['session_id'], fn($q) => $q->where('session_id', $identifier['session_id']))
+                ->when($identifier['token'], fn($q) => $q->where('token', $identifier['token']))
                 ->delete() > 0;
     }
 
@@ -166,17 +165,17 @@ class CartService
 
         return CartItem::query()
             ->when($identifier['user_id'], fn($q) => $q->where('user_id', $identifier['user_id']))
-            ->when($identifier['session_id'], fn($q) => $q->where('session_id', $identifier['session_id']))
+            ->when($identifier['token'], fn($q) => $q->where('token', $identifier['token']))
             ->delete();
     }
 
     /**
      * Merge guest cart with user cart on login
      */
-    public function mergeGuestCart(string $guestSessionId, int $userId): void
+    public function mergeGuestCart(string $guestToken, int $userId): void
     {
-        DB::transaction(function () use ($guestSessionId, $userId) {
-            $guestItems = CartItem::where('session_id', $guestSessionId)->get();
+        DB::transaction(function () use ($guestToken, $userId) {
+            $guestItems = CartItem::where('token', $guestToken)->get();
 
             foreach ($guestItems as $guestItem) {
                 $userItem = CartItem::where([
@@ -194,7 +193,7 @@ class CartService
                 } else {
                     $guestItem->update([
                         'user_id' => $userId,
-                        'session_id' => null,
+                        'token' => null,
                     ]);
                 }
             }
@@ -222,8 +221,8 @@ class CartService
                 $errors[] = "Product '{$item->product->name}' is no longer available.";
             }
 
-            if (!$item->hasEnoughStock()) {
-                $stock = $item->variant?->stock_quantity ?? $item->product->stock_quantity;
+            $stock = $item->variant?->stock_quantity ?? $item->product->stock_quantity;
+            if ($item->quantity > $stock) {
                 $errors[] = "Only {$stock} items left for '{$item->product->name}'.";
             }
         }

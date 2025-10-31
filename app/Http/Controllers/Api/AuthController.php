@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ApiResponse;
 use App\Services\CartService;
 use App\Models\User;
+use App\Enums\UserRole;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
@@ -35,7 +36,7 @@ class AuthController extends Controller
             'name'     => $validated['name'],
             'email'    => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role'     => 'customer', // Default role
+            'role'     => UserRole::Customer, // Default role - only customers can register
         ]);
 
         $token = $user->createToken('auth-token')->plainTextToken;

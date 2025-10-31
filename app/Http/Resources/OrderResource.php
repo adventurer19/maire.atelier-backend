@@ -31,7 +31,15 @@ class OrderResource extends JsonResource
                     'phone' => $this->guest_phone,
                 ]
             ),
-            'address'      => new AddressResource($this->whenLoaded('address')),
+            'address'      => $this->when(
+                $this->relationLoaded('shippingAddress') || $this->relationLoaded('address'),
+                function () {
+                    $address = $this->relationLoaded('shippingAddress') 
+                        ? $this->shippingAddress 
+                        : ($this->relationLoaded('address') ? $this->address : null);
+                    return $address ? new AddressResource($address) : null;
+                }
+            ),
             'items'        => OrderItemResource::collection($this->whenLoaded('items')),
         ];
     }

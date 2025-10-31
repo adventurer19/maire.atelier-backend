@@ -54,11 +54,12 @@ class User extends Authenticatable
 
     /**
      * Determine if user can access Filament admin panel
-     * ✅ Only admins can log in
+     * ✅ Only admins and editors can access admin panel
+     * Customers cannot access the admin panel
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->isAdmin();
+        return $this->role->canAccessAdmin(); // Admin or Editor
     }
 
     // ============================================

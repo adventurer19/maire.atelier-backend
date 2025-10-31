@@ -54,6 +54,7 @@ Route::prefix('categories')->group(function () {
 // 🎯 Collections
 Route::prefix('collections')->group(function () {
     Route::get('/', [CollectionController::class, 'index']);
+    Route::get('/latest', [CollectionController::class, 'latest']);
     Route::get('/{collection:slug}', [CollectionController::class, 'show']);
 });
 
@@ -96,9 +97,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // ❤️ Wishlist
     Route::prefix('wishlist')->group(function () {
         Route::get('/', [WishlistController::class, 'index']);
-        Route::post('/', [WishlistController::class, 'add']);
-        Route::delete('/{product}', [WishlistController::class, 'remove']);
-        Route::post('/toggle/{product}', [WishlistController::class, 'toggle']);
+        Route::post('/', [WishlistController::class, 'store']);
+        Route::delete('/{product}', [WishlistController::class, 'destroy']);
+        // Toggle endpoint - can be added later if needed
+        // Route::post('/toggle/{product}', [WishlistController::class, 'toggle']);
     });
 
     // 🏠 Addresses

@@ -54,6 +54,10 @@ class CollectionController extends Controller
     {
         $collection = Collection::where('id', $id)
             ->orWhere('slug', $id)
+            ->with(['products' => function ($query) {
+                $query->where('is_active', true)
+                    ->with(['categories', 'variants.attributeOptions', 'media']);
+            }])
             ->first();
 
         if (! $collection) {
@@ -108,5 +112,49 @@ class CollectionController extends Controller
         $collection->delete();
 
         return $this->ok(['message' => __('Collection deleted successfully')]);
+    }
+
+    /**
+     * GET /api/collections/latest
+     * Get the latest/featured collection with its products.
+     */
+    public function latest(): JsonResponse
+    {
+        // Try to find featured collection first, then latest by date
+        $collection = Collection::query()
+            ->where('is_active', true)
+            ->with(['products' => function ($query) {
+                $query->where('is_active', true)
+                    ->with(['categories', 'media'])
+                    ->limit(8) // Limit to 8 products for homepage carousel
+                    ->orderBy('created_at', 'desc');
+            }])
+            ->where(function ($query) {
+                $query->where('is_featured', true)
+                    ->orWhere('created_at', '>=', now()->subMonths(3)); // Collections from last 3 months
+            })
+            ->orderByDesc('is_featured') // Prioritize featured
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (! $collection) {
+            // Fallback: get any active collection
+            $collection = Collection::query()
+                ->where('is_active', true)
+                ->with(['products' => function ($query) {
+                    $query->where('is_active', true)
+                        ->with(['categories', 'media'])
+                        ->limit(8)
+                        ->orderBy('created_at', 'desc');
+                }])
+                ->orderByDesc('created_at')
+                ->first();
+        }
+
+        if (! $collection) {
+            return $this->error('NOT_FOUND', __('No collections found'), [], 404);
+        }
+
+        return $this->ok(new CollectionResource($collection));
     }
 }
